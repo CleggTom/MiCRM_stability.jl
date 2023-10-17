@@ -1,69 +1,51 @@
 #jacobian
 
 function jacobian!(p::Parameters, J)
+    #loop over consumers
     for i = 1:p.N
-        #loop over consumers
         for j = 1:p.N
-            #diagonal
             if i == j
-                J[i,j] = -p.ω[i]
-                for a = 1:p.M
-                    J[i,j] += p.β[i,a] * p.μ_x[i,a]
-                    for b = 1:p.M
-                        J[i,j] -= p.β[i,a] * p.T[i,a] * p.ψ[i,a,b] * (p.μ_x[i,a] + p.ζ_x[i,a,b])
-                    end
-                end
+                J[i,i] = p.e.gx[i] - p.e.mx[i]
             else
                 J[i,j] = 0
             end
-            J[i,j] *= p.a_x[i]
+            
+            J[i,j] *= p.s.α[i]
         end
 
-        #loop over resources
-        for c = 1:p.M
-            J[i,p.N + c] = p.β[i,c] * p.μ_x[i,c]
-
-            for a = 1:p.M
-                J[i,p.N + c] -= p.β[i,a] * p.T[i,a] * p.ψ[i,a,c] * p.ζ_P[i,a,c]
-            end
-
-            for b = 1:p.M
-                J[i,p.N + c] -= p.β[i,c] * p.T[i,c] * p.ψ[i,c,b] * (p.μ_y[i,c] + p.ζ_S[i,c,b])
-            end
-            J[i,p.N + c] *= p.a_x[i]
+        for a = 1:p.M
+            J[i, a + p.M] = p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a] + p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a] + p.e.ωy[i,a]
+            
+            J[i, a + p.M] *= p.s.α[i]
         end
-        
-        
+
     end
 
-    #loop over resources
     for a = 1:p.M
-        #over consumers
-        for j = 1:p.N
-            J[a + p.N, j] = -p.σ̃[a] * p.γ[j,a] * p.μ_x[j,a]
-            for b = 1:p.M
-                J[a + p.N, j] -= p.ρ̃[a] * p.ϕ[j,b,a] * (p.μ_x[j,a] + p.ζ_x[j,b,a])
-            end
-            J[p.N + a, j] *= p.a_y[a]
+        for i = 1:p.N
+            J[a + p.M, i] = p.e.gx[i] * (p.s.ρ̃[a] * p.s.η[i,a] - p.s.σ̃[a] p.s.γ[i,a] )
         end
 
-        #over resources
-        for c = 1:p.M
-            if a == c
-                J[a + p.N, c + p.N] = p.ρ[a] * p.ι[a] - p.σ[a] * p.ϱ[a]
-                    for i = 1:p.N
-                        J[a + p.N, c + p.N] -= p.σ̃[a] * p.γ[i,a] * p.μ_y[i,a] 
-                        for b = 1:p.M
-                            J[a + p.N, c + p.N] += p.ρ̃[a] * p.ϕ[i,b,a] * p.ζ_P[i,b,a]
-                        end
-                    end
-            else
-                J[a + p.N, c + p.N] = 0.0
+        for b = 1:p.M
+            if a == b
+                J[a + p.M, a + p.M] = p.s.ρ[a] * p.e.iy[a] - p.s.σ[a] * p.e.oy[a]
+
                 for i = 1:p.N
-                    J[a + p.N, c + p.N] += p.ρ̃[a] * p.ϕ[i,c,a] * (p.μ_y[i,c] + p.ζ_S[i,c,a])
+                    J[a + p.M, a + p.M] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,a] * (p.s.χ[i,a] * (p.e.gs[i] - 1) +1) + p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a] )
+
+                    J[a + p.M, a + p.M] += p.s.ρ̃[a] * p.s.η[i,a] * (p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a] + p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a] + p.e.λy[i,a] + p.e.θy[i,a,a])
                 end
+
+            else 
+                J[a + p.M, b + p.M] = 0
+                
+                for i = 1:p.N
+                    J[a + p.M, b + p.M] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,b] * p.s.χ[i,b] * (p.e.gs[i] - 1) + p.e.gw[i] * p.s.ϕ[i,b] * p.e.hy[i,b])
+
+                    J[a + p.M, b + p.M] += p.s.ρ̃[a] * p.s.η[i,a] * (p.e.gs[i] * p.s.χ[i,b] * p.e.fy[i,b] + p.e.gw[i] * p.s.ϕ[i,b] * p.e.hy[i,b] + p.e.λy[i,b] + p.e.θy[i,a,b])
+                end
+
             end
-            J[p.N + a, p.N + c] *= p.a_y[a]
         end
     end
 end
