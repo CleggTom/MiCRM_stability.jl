@@ -1,48 +1,51 @@
-struct structural_params
-    #scale params
-    α::Vector{Float64} #scale param for consumers
-    β::Vector{Float64} #scale param for resources
+function get_structural_params(U,K)
+    N,M = size(U)
+    #structural
+    α = ones(N)
+    β = ones(M)
+    
+    #branching
+    ρ = zeros(N)
+    ρ[sum(K,dims=1)[:] .== 0] .= 1.0
+    ρ̃ = 1 .- ρ
+    
+    σ = zeros(N)
+    σ[sum(U,dims=1)[:] .== 0] .= 1.0
+    σ̃ = 1 .- σ
+    
+    γ = U ./ (norm.(eachcol(U), 1)')
+    η = K ./ (norm.(eachcol(K), 1)')
+    χ = U ./ (norm.(eachrow(U), 1))
+    ϕ = K ./ (norm.(eachrow(K), 1))
+    
+    γ[isnan.(γ)] .= 0.0 
+    η[isnan.(η)] .= 0.0 
+    χ[isnan.(χ)] .= 0.0 
+    ϕ[isnan.(ϕ)] .= 0.0 
 
-    #branching params
-    ρ::Vector{Float64} #prop of resource gain from inflow
-    ρ̃::Vector{Float64} #prop of resource gain from leakage
-   
-    σ::Vector{Float64} #prop of resource loss from outlfow
-    σ̃::Vector{Float64} #prop of resource loss from uptake
-   
-    γ::Matrix{Float64} #prop of uptake loss from consumer i
-    η::Matrix{Float64} #prop of leakage gain from consumer i
-
-    χ::Matrix{Float64} #prop of substrate gain from resource a
-    ϕ::Array{Float64, 3} #prop of waste product to resource a
+    return MiCRM_stability.structural_params(α,β,ρ,ρ̃,σ,σ̃,γ,η,χ,ϕ);
 end
 
-struct exponential_params
-    #consumer growth
-    gx::Vector{Float64} #growth to consumer
-    gs::Vector{Float64} #growth to substrates
-    gw::Vector{Float64} #growth to waste products
-    
-    #consumer mortality
-    mx::Vector{Float64} #mortality to consumer
-    
-    #consumer uptake + leakage stochiometry
-    fy::Matrix{Float64} #substrate proportion to resource
-    hy::Matrix{Float64} #waste proportion to resource
+get_structural_params(c::Community) = get_structural_params(c.U, c.U * c.L)
 
-    #Leakage structure
-    λy::Matrix{Float64} #total leakage to resources
-    ωy::Matrix{Float64} #total growth allocation to resources
-    θy::Array{Float64,3} #relative leakage to resources
-
-    #external resource dynamics
-    iy::Vector{Float64}
-    oy::Vector{Float64}
-end
+function get_exponential_parameters(N,M)
+    gx = (0.5) .+ (rand(N) / 2)
+    gs = (0.5) .+ (rand(N))
+    gw = -(0.5) .+ (rand(N))
     
-struct Parameters
-    N::Int64 #number of consumers
-    M::Int64 #number of resources
-    s::structural_params
-    e::exponential_params
+    mx = ones(N)
+    
+    fy = ones(N,M) .+ rand(Normal(0,0.1), (N,M))
+    hy = ones(N,M)
+    
+    λy = zeros(N,M)
+    ωy = zeros(N,M)
+    θy = zeros(N,M,M)
+    
+    iy = (0.5) .+ (rand(M) / 2)
+    oy = (0.5) .+ (rand(M) / 2)
+
+    return MiCRM_stability.exponential_params(gx,gs,gw,mx,fy,hy,λy,ωy,θy,iy,oy)
 end
+
+get_structural_params(c::Community) = get_structural_params(c.N, c.M)

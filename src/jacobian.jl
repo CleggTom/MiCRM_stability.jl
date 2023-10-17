@@ -1,5 +1,4 @@
 #jacobian
-
 function jacobian!(p::Parameters, J)
     #loop over consumers
     for i = 1:p.N
@@ -23,7 +22,7 @@ function jacobian!(p::Parameters, J)
 
     for a = 1:p.M
         for i = 1:p.N
-            J[a + p.M, i] = p.e.gx[i] * (p.s.ρ̃[a] * p.s.η[i,a] - p.s.σ̃[a] p.s.γ[i,a] )
+            J[a + p.M, i] = p.e.gx[i] * (p.s.ρ̃[a] * p.s.η[i,a] - p.s.σ̃[a] * p.s.γ[i,a])
         end
 
         for b = 1:p.M
@@ -31,7 +30,8 @@ function jacobian!(p::Parameters, J)
                 J[a + p.M, a + p.M] = p.s.ρ[a] * p.e.iy[a] - p.s.σ[a] * p.e.oy[a]
 
                 for i = 1:p.N
-                    J[a + p.M, a + p.M] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,a] * (p.s.χ[i,a] * (p.e.gs[i] - 1) +1) + p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a] )
+                    J[a + p.M, a + p.M] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,a] * (p.s.χ[i,a] * (p.e.gs[i] - 1) +1) + 
+                    p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a])
 
                     J[a + p.M, a + p.M] += p.s.ρ̃[a] * p.s.η[i,a] * (p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a] + p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a] + p.e.λy[i,a] + p.e.θy[i,a,a])
                 end

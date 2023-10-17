@@ -1,0 +1,55 @@
+struct structural_params
+    #scale params
+    α::Vector{Float64} #scale param for consumers
+    β::Vector{Float64} #scale param for resources
+
+    #branching params
+    ρ::Vector{Float64} #prop of resource gain from inflow
+    ρ̃::Vector{Float64} #prop of resource gain from leakage
+   
+    σ::Vector{Float64} #prop of resource loss from outlfow
+    σ̃::Vector{Float64} #prop of resource loss from uptake
+   
+    γ::Matrix{Float64} #prop of uptake loss from consumer i
+    η::Matrix{Float64} #prop of leakage gain from consumer i
+
+    χ::Matrix{Float64} #prop of substrate gain from resource a
+    ϕ::Matrix{Float64} #prop of waste product to resource a
+end
+
+struct exponential_params
+    #consumer growth
+    gx::Vector{Float64} #growth to consumer
+    gs::Vector{Float64} #growth to substrates
+    gw::Vector{Float64} #growth to waste products
+    
+    #consumer mortality
+    mx::Vector{Float64} #mortality to consumer
+    
+    #consumer uptake + leakage stochiometry
+    fy::Matrix{Float64} #substrate proportion to resource
+    hy::Matrix{Float64} #waste proportion to resource
+
+    #Leakage structure
+    λy::Matrix{Float64} #total leakage to resources
+    ωy::Matrix{Float64} #total growth allocation to resources
+    θy::Array{Float64,3} #relative leakage to resources
+
+    #external resource dynamics
+    iy::Vector{Float64}
+    oy::Vector{Float64}
+end
+    
+struct Parameters
+    N::Int64 #number of consumers
+    M::Int64 #number of resources
+    s::structural_params
+    e::exponential_params
+end
+
+struct Community
+    N::Int64
+    M::Int64
+    U::Matrix{Float64}
+    L::Matrix{Float64}
+end
