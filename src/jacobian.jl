@@ -1,5 +1,6 @@
 #jacobian
 function jacobian!(p::Parameters, J)
+    J .= 0
     #loop over consumers
     for i = 1:p.N
         for j = 1:p.N
@@ -23,6 +24,8 @@ function jacobian!(p::Parameters, J)
     for a = 1:p.M
         for i = 1:p.N
             J[a + p.N, i] = p.e.gx[i] * (p.s.ρ̃[a] * p.s.η[i,a] - p.s.σ̃[a] * p.s.γ[i,a])
+            
+            J[a + p.N, i] *= p.s.β[a]
         end
 
         for b = 1:p.M
@@ -30,10 +33,10 @@ function jacobian!(p::Parameters, J)
                 J[a + p.N, a + p.N] = p.s.ρ[a] * p.e.iy[a] - p.s.σ[a] * p.e.oy[a]
 
                 for i = 1:p.N
-                    J[a + p.N, a + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,a] * (p.s.χ[i,a] * (p.e.gs[i] - 1) +1) + 
-                    p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a])
+                    J[a + p.N, a + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,a] * (p.s.χ[i,a] * (p.e.gs[i] - 1) + 1) + p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a])
 
-                    J[a + p.N, a + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a] + p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a] + p.e.λy[i,a] + p.e.θy[i,a,a])
+                    J[a + p.N, a + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (p.e.hy[i,a] * (p.s.ϕ[i,a] * (p.e.gw[i] - 1) + 1) + p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a] +
+                    p.e.λy[i,a]) 
                 end
 
             else 
@@ -42,10 +45,13 @@ function jacobian!(p::Parameters, J)
                 for i = 1:p.N
                     J[a + p.N, b + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,b] * p.s.χ[i,b] * (p.e.gs[i] - 1) + p.e.gw[i] * p.s.ϕ[i,b] * p.e.hy[i,b])
 
-                    J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (p.e.gs[i] * p.s.χ[i,b] * p.e.fy[i,b] + p.e.gw[i] * p.s.ϕ[i,b] * p.e.hy[i,b] + p.e.λy[i,b] + p.e.θy[i,a,b])
+                    J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (p.e.hy[i,b] * p.s.ϕ[i,b] * (p.e.gw[i] - 1) + p.e.gs[i] * p.s.χ[i,b] * p.e.fy[i,b] + p.e.λy[i,b]) 
                 end
 
             end
+
+            J[a + p.N, b + p.N] *= p.s.β[a]
         end
     end
 end
+

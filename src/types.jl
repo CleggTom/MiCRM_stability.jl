@@ -33,7 +33,6 @@ struct exponential_params
     #Leakage structure
     λy::Matrix{Float64} #total leakage to resources
     ωy::Matrix{Float64} #total growth allocation to resources
-    θy::Array{Float64,3} #relative leakage to resources
 
     #external resource dynamics
     iy::Vector{Float64}
