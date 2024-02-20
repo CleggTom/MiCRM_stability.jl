@@ -14,7 +14,7 @@ function jacobian!(p::Parameters, J)
         end
 
         for a = 1:p.M
-            J[i, a + p.N] = p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a] + p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a] + p.e.ωy[i,a]
+            J[i, a + p.N] = (p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a]) + (p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a]) + (p.e.ωy[i,a])
             
             J[i, a + p.N] *= p.s.α[i]
         end
@@ -33,7 +33,7 @@ function jacobian!(p::Parameters, J)
                 J[a + p.N, a + p.N] = p.s.ρ[a] * p.e.iy[a] - p.s.σ[a] * p.e.oy[a]
 
                 for i = 1:p.N
-                    J[a + p.N, a + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,a] * (p.s.χ[i,a] * (p.e.gs[i] - 1) + 1) + p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a])
+                    J[a + p.N, a + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,a] * (p.s.χ[i,a] * (p.e.gs[i] - 1) + 1) + (p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a]))
 
                     J[a + p.N, a + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (p.e.hy[i,a] * (p.s.ϕ[i,a] * (p.e.gw[i] - 1) + 1) + p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a] +
                     p.e.λy[i,a]) 
@@ -55,3 +55,34 @@ function jacobian!(p::Parameters, J)
     end
 end
 
+##Metrics
+function gc(J)
+    G = similar(J)
+    v = size(J)[1]
+    for i = 1:v
+        x0 = zeros(v)
+        x0[i] = 1.0
+        G[i,:] = -inv(J) * x0
+    end
+    return(G)
+end
+
+function se(J, i) 
+    vals = eigvals(J)
+    v = eigvecs(J)
+    s = 0
+    for n = eachindex(vals)
+        s += abs(v[i,n]) / vals[n]
+    end
+    return(log(s)) 
+end
+
+function im(J, i) 
+    vals = eigvals(J)
+    w = inv(eigvecs(J))
+    s = 0
+    for n = eachindex(vals)
+        s += abs(w[i,n]) / vals[n]
+    end
+    return(log(s)) 
+end
