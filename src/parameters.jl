@@ -31,7 +31,7 @@ function get_structural_params(U,K,N,M)
     return MiCRM_stability.structural_params(α,β,ρ,ρ̃,σ,σ̃,γ,η,χ,ϕ);
 end
 
-get_structural_params(c::Community) = get_structural_params(c.U, c.U * c.L, c.N, c.M)
+get_structural_params(c::Community) = get_structural_params(c.U, c.L, c.N, c.M)
 
 function get_exponential_parameters(N,M)
     σ = 0.1

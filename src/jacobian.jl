@@ -67,22 +67,39 @@ function gc(J)
     return(G)
 end
 
-function se(J, i) 
+
+"""
+    se(J, i)
+
+calculate sensitvtiy of the ith element from a jacobian
+"""
+function se(J) 
+    L = size(J)[1]
     vals = eigvals(J)
     v = eigvecs(J)
-    s = 0
-    for n = eachindex(vals)
-        s += abs(v[i,n]) / vals[n]
+    s = zeros(Complex, L)
+    for i = 1:L
+        for n = eachindex(vals)
+            s[i] += abs(v[i,n]) / vals[n]
+        end
     end
-    return(log(s)) 
+    return(log.(-s)) 
 end
 
-function im(J, i) 
+"""
+    im(J, i)
+
+calculate the impact of perturbing the ith element in a system
+"""
+function im(J) 
+    L = size(J)[1]
     vals = eigvals(J)
     w = inv(eigvecs(J))
-    s = 0
-    for n = eachindex(vals)
-        s += abs(w[i,n]) / vals[n]
+    s = zeros(Complex, L)
+    for i = 1:L
+        for n = eachindex(vals)
+            s[i] += abs(w[i,n]) / vals[n]
+        end
     end
-    return(log(s)) 
+    return(log.(-s)) 
 end
