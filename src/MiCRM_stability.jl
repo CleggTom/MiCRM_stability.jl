@@ -1,6 +1,6 @@
 module MiCRM_stability
 
-using LinearAlgebra, Distributions, SpecialFunctions
+using LinearAlgebra, Distributions, SpecialFunctions, StatsBase
 
 # Write your package code here.
 include("types.jl")
