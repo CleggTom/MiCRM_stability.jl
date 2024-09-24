@@ -4,48 +4,69 @@ function jacobian!(p::Parameters, J)
     #loop over consumers
     for i = 1:p.N
         for j = 1:p.N
+            #dxi/dxi
             if i == j
-                J[i,i] = p.e.gx[i] - p.e.mx[i]
-            else
-                J[i,j] = 0
+                J[i,i] = p.s.α[i] * (1 - p.s.Λ[i]) * (p.e.gx[i] - p.e.mx[i])
             end
-            
-            J[i,j] *= p.s.α[i]
         end
 
+        
         for a = 1:p.M
-            J[i, a + p.N] = (p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a]) + (p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a]) + (p.e.ωy[i,a])
-            
-            J[i, a + p.N] *= p.s.α[i]
+            #dxi/dya
+            J[i, a + p.N] = p.s.α[i] * ( 
+                (1 - p.s.Λ[i]) * (
+                (p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a]) +
+                (p.e.gw[i] * p.u.wy[i,a])
+                ) +
+                (p.s.Λ[i] * p.e.λy[i,a])
+            )
         end
 
     end
 
     for a = 1:p.M
         for i = 1:p.N
-            J[a + p.N, i] = p.e.gx[i] * (p.s.ρ̃[a] * p.s.η[i,a] - p.s.σ̃[a] * p.s.γ[i,a])
-            
-            J[a + p.N, i] *= p.s.β[a]
+            #dya/dxi
+            J[a + p.N, i] = p.s.β[a] * p.e.gx[i] * (
+                p.s.ρ̃[a] * p.s.η[i,a] - p.s.σ̃[a] * p.s.γ[i,a]
+            )
         end
 
         for b = 1:p.M
+            #dya/dya
             if a == b
                 J[a + p.N, a + p.N] = p.s.ρ[a] * p.e.iy[a] - p.s.σ[a] * p.e.oy[a]
 
                 for i = 1:p.N
-                    J[a + p.N, a + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,a] * (p.s.χ[i,a] * (p.e.gs[i] - 1) + 1) + (p.e.gw[i] * p.s.ϕ[i,a] * p.e.hy[i,a]))
+                    J[a + p.N, a + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (
+                        p.e.fy[i,a] * (p.s.χ[i,a] * (p.e.gs[i] - 1) + 1) + 
+                        (p.e.gw[i] * p.u.wy[i,a])
+                    )
 
-                    J[a + p.N, a + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (p.e.hy[i,a] * (p.s.ϕ[i,a] * (p.e.gw[i] - 1) + 1) + p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a] +
-                    p.e.λy[i,a]) 
+                    J[a + p.N, a + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (
+                        p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a] +
+                        p.e.gw[i] * p.u.wy[i,a] +
+                        p.e.λy[i,a] +
+                        p.u.py[i,a,a]
+                    ) 
                 end
 
             else 
+                #dya/dya
                 J[a + p.N, b + p.N] = 0
                 
                 for i = 1:p.N
-                    J[a + p.N, b + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (p.e.fy[i,b] * p.s.χ[i,b] * (p.e.gs[i] - 1) + p.e.gw[i] * p.s.ϕ[i,b] * p.e.hy[i,b])
+                    J[a + p.N, b + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (
+                        p.e.fy[i,b] * p.s.χ[i,b] * (p.e.gs[i] - 1) +
+                        p.e.gw[i] * p.u.wy[i,b]
+                        )
 
-                    J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (p.e.hy[i,b] * p.s.ϕ[i,b] * (p.e.gw[i] - 1) + p.e.gs[i] * p.s.χ[i,b] * p.e.fy[i,b] + p.e.λy[i,b]) 
+                    J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (
+                        p.e.gs[i] * p.s.χ[i,b] * p.e.fy[i,b] +
+                        p.e.gw[i] * p.u.wy[i,b] +
+                        p.e.λy[i,b] +
+                        p.u.py[i,a,b]
+                    ) 
                 end
 
             end
@@ -56,15 +77,13 @@ function jacobian!(p::Parameters, J)
 end
 
 ##Metrics
-function gc(J)
-    G = similar(J)
-    v = size(J)[1]
-    for i = 1:v
-        x0 = zeros(v)
+function gc!(G, J, x0)
+    # G = similar(J)
+    for i = eachindex(x0)
         x0[i] = 1.0
-        G[i,:] = -inv(J) * x0
+        G[i,:] = -J \ x0
+        x0[i] = 0.0
     end
-    return(G)
 end
 
 

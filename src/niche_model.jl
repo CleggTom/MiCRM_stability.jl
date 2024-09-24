@@ -11,6 +11,26 @@ function rand_community(N,M,C,Nin, Nout)
     return( Community(N,M,U,L))
 end
 
+function specialist_community(N,M,p,o,k,Nin,Nout)
+    U = fill(0.01, N,M) .+ (o .* (rand(N,M) .< p))
+    L = fill(0.01, N,M)
+    
+    #sample L based on Usums
+    Usum = sum(U,dims=1)[:]
+    probs = (Usum .- minimum(Usum)) ./ (maximum(Usum) - minimum(Usum))
+    probs = [x > 0 ? x .^ k : 0 for x = probs]
+
+    for i = 1:N
+        L[i,sample(1:M, Weights(probs), rand(Binomial(M, p)), replace = false)] .+= o
+    end
+
+    U[:,rand(1:M, Nout)] .= 0
+    L[:,rand(1:M, Nin)] .= 0
+
+    return( Community(N,M,U,L))
+end
+
+
 """
     rand_com(N,M,C, ci = rand(N), ca = rand(M))
 
@@ -77,13 +97,13 @@ function modular_community(N,M,Nclass,pgen,Cg,Co,Ci,Csp,Csw,Css)
 
     D[:, rclass[1]] .= 0
 
-    [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
+    # [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
 
-    return(Community(N,M,rand(N,M) .* U,rand(N,M) .* (U * D)))
+    return(Community(N,M, U, D))
 
 end
 
-function nested_community(N,M,κ,v)
+function nested_community(N,M,κ,v, Nin, Nout)
     U = zeros(N,M)
     L = zeros(N,M)
 
@@ -103,12 +123,106 @@ function nested_community(N,M,κ,v)
         nj = (sum(L,dims=1)[:] .+ 1) .^ v
         p = nj ./ sum(nj)
         L[i,:] .= rand(Multinomial(Z,p)) .> 0
+
+        
     end
-    ind = sortperm(sum(U, dims = 1)[:])
-    return(Community(N,M,rand(N,M) .* U[:,ind], rand(N,M) .* L[:,ind]))
+    ind = sortperm(sum(U .> 0, dims = 1)[:], rev = true)
+
+    U[:,rand(1:M, Nout)] .= 0
+    L[:,rand(1:M, Nin)] .= 0
+    
+
+    return(Community(N,M, U[:,ind] .* rand(N,M),  L[:,ind] .* rand(N,M)))
 end
 
 function empirical_communty(N, C, D)
     ind = rand(1:size(C)[1], N)
     return(Community(N,size(C)[2],C[ind,:],D[ind,:]))
+end
+
+function attachment_community(N, M, C, T, pa = (x,T) -> exp(-abs(x - 1) / T))
+    #setup matricies
+    U = zeros(N,M)
+    L = zeros(N,M)
+
+    #initial skeleton
+    #first resource not leaked
+    B = 10
+    U[1,1:B] .= 1
+    
+    ind = shuffle(1:(N+M-B-1))
+    x = vcat(fill(:N,N-1),fill(:M, M-1))[ind]
+
+    #numbers of links
+    l_vec = fill(1, N+M-B-1)
+    
+    sN,sM = ones(N), ones(M)
+    kN,kM = 1,B
+    for i = eachindex(x)
+        if x[i] == :N
+            kN += 1
+            #inital connection
+            v = rand(1:kM)
+            U[kN,v] = 1
+            sN[kN] = sM[v] + 1
+    
+        #     #other links
+        #     p_vec = pa.(sN[kN] .- sM[1:kM], T)
+        #     l = min(Int.(floor.(kM * l_vec[i])), sum(p_vec .> 0)) #
+        #     U[kN, sample(1:kM, Weights(p_vec), l, replace = false)] .= 1
+            
+        else
+            kM += 1
+            #inital connection
+            v = rand(1:kN)
+            L[v, kM] = 1
+            sM[kM] = sN[v] + 1
+    
+        #     #other links
+        #     p_vec = pa.(sM[kM] .- sN[1:kN], T) 
+        #     l = min(Int.(floor.(kN * l_vec[i])), sum(p_vec .> 0)) #
+            
+        #     L[sample(1:kN, Weights(p_vec), l, replace = false), kM] .= 1
+        end
+    end
+
+    #get distancesa
+    Udiff = sN .- sM'
+    Ldiff = sM .- sN'
+    #convert to probs
+    pU = (pa.(Udiff, T))
+    pL = (pa.(Ldiff', T)) 
+    #normalise to desired connectance
+    Nl = C * ((N * M) - sum(U + L))
+    pU .= Nl .* pU ./ sum(pU)
+    pL .= Nl .* pL ./ sum(pL)
+
+    U .= min.(1, U .+ (pU .> rand(N,M)))
+    L .= min.(1, L .+ (pL .> rand(N,M)))
+    
+    # #add additional links
+    # Up_mat = pa.(sN .- sM', T) .* rand(N,M) .* C
+    # Lp_mat = pa.((sM .- sN')', T) .* rand(N,M) .* C
+
+    # #add to matricies
+    # U .+= Up_mat
+    # L .+= Lp_mat
+
+    # #add for all but first resource
+    # kN,kM = 1,B
+    # for i = eachindex(x)
+    #     if x[i] == :N
+    #         kN += 1
+    #         l = min(Int.(floor.(kM * l_vec[i])), sum(p_vec .> 0))
+    #         v = sample(1:M, Weights(p_mat[kN,:]), l_vec[i])
+    #         U[kN, v] .= 1
+    #     else
+    #         kM += 1
+    #         v = sample(1:N, Weights(p_mat[:,kM]), l_vec[i])
+    #         U[kN, v] .= 1
+    #     end
+    # end
+
+
+    return(MiCRM_stability.Community(N, M, U, L))
 end
