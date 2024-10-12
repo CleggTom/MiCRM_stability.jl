@@ -1,3 +1,13 @@
+function calculate_g_s(p::Parameters)
+    res = zeros(p.N,p.M)
+    for i = 1:p.N
+        for a = 1:p.M
+            res[i,a] = p.e.fy[i,a] * p.s.χ[i,a] * (p.e.gs[i] - 1)
+        end
+    end
+    return(res)
+end
+
 #jacobian
 function jacobian!(p::Parameters, J)
     J .= 0
@@ -9,16 +19,12 @@ function jacobian!(p::Parameters, J)
                 J[i,i] = p.s.α[i] * (1 - p.s.Λ[i]) * (p.e.gx[i] - p.e.mx[i])
             end
         end
-
         
         for a = 1:p.M
             #dxi/dya
             J[i, a + p.N] = p.s.α[i] * ( 
-                (1 - p.s.Λ[i]) * (
-                (p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a]) +
-                (p.e.gw[i] * p.u.wy[i,a])
-                ) +
-                (p.s.Λ[i] * p.e.λy[i,a])
+                (1 - p.s.Λ[i]) * ((p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a])) +
+                (p.s.Λ[i]) * (p.e.λy[i,a])
             )
         end
 
@@ -35,43 +41,29 @@ function jacobian!(p::Parameters, J)
         for b = 1:p.M
             #dya/dya
             if a == b
+                #external supply and outflow
                 J[a + p.N, a + p.N] = p.s.ρ[a] * p.e.iy[a] - p.s.σ[a] * p.e.oy[a]
-
-                for i = 1:p.N
-                    J[a + p.N, a + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (
-                        p.e.fy[i,a] * (p.s.χ[i,a] * (p.e.gs[i] - 1) + 1) + 
-                        (p.e.gw[i] * p.u.wy[i,a])
-                    )
-
-                    J[a + p.N, a + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (
-                        p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a] +
-                        p.e.gw[i] * p.u.wy[i,a] +
-                        p.e.λy[i,a] +
-                        p.u.py[i,a,a]
-                    ) 
-                end
-
-            else 
-                #dya/dya
-                J[a + p.N, b + p.N] = 0
-                
-                for i = 1:p.N
-                    J[a + p.N, b + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (
-                        p.e.fy[i,b] * p.s.χ[i,b] * (p.e.gs[i] - 1) +
-                        p.e.gw[i] * p.u.wy[i,b]
-                        )
-
-                    J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * (
-                        p.e.gs[i] * p.s.χ[i,b] * p.e.fy[i,b] +
-                        p.e.gw[i] * p.u.wy[i,b] +
-                        p.e.λy[i,b] +
-                        p.u.py[i,a,b]
-                    ) 
-                end
-
             end
 
-            J[a + p.N, b + p.N] *= p.s.β[a]
+            for i = 1:p.N
+                if a == b
+                    #direct uptake effects
+                    J[a + p.N, a + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * p.e.fy[i,a]
+                end
+        #         #uptake effect
+                J[a + p.N, b + p.N] += p.s.σ̃[a] * p.s.γ[i,b] * p.tmp[1][i,b]
+                
+                #release direct effect
+                J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,b] * p.e.fy[i,b] * p.s.ϕ[i][b,a] 
+                
+                #release total effects
+                tmp = 0.0
+                for c = 1:p.M
+                    tmp +=  p.s.ϕ[i][c,a] * (p.tmp[1][i,b] + p.e.λy[i,b])
+                end
+                J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * tmp
+            end 
+            
         end
     end
 end

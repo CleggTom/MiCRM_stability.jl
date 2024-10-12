@@ -1,94 +1,200 @@
-function niche_model(N,M,D,Cu,Cl)
-    ci = [rand(D) for i = 1:N]
-    ci = ci[sortperm(sum.(ci))]
-
-    ca = [rand(D) for i = 1:M]
-    ca = ca[sortperm(sum.(ca))]
-
-    β = (1/Cu) - 1
-
-    U = MiCRM_stability.generate_U_mat(N,M,ci,ca, MiCRM_stability.d_manhat, β)
-    L = MiCRM_stability.generate_L_mat(M,ca, MiCRM_stability.d_manhat, Cl)
-
-    return(Community(N,M,U,L))
-end
-
-"""
-    rand_model(N,M, C = 0.3)
-
-generate a uniform random community with a given connectance value
-"""
-function rand_model(N,M, μ, σ, Cu, Cl)
-    dMn = MultivariateNormal(μ,σ)
-    x = rand(dMn, max(N,M), M)
-
-    U = [cdf(Normal(μ[1],σ[1,1]),y[1]) for y = x[1:N,1:M]]
-    L = [cdf(Normal(μ[2],σ[2,2]),y[2]) for y = x[1:M,1:M]]
+function random_community(N,M,C)
+    U = Float64.(rand(N,M) .< C) 
+    U[:,rand(1:M,rand(1:M))] .= 0 #some resources not consumed
     
-    U = U .* (rand(N,M) .< Cu)
-    L = L .* (rand(M,M) .< Cl)
-    # U = 
+    D =  Float64.(rand(M,M) .< C) 
+    # D[:,rand(1:M,rand(1:M))] .= 0 #some resources not leaked
+    [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
+    D[isnan.(D)] .= 0.0
 
-    # for i = 1:M
-    #     L[i,:] .= L[i,:] ./ sum(L[i,:])
-    # end
-
-    return Community(N,M,U,L)
+    return(Community(N,M,U,D))
 end
 
-function correlated_rand_model(N,M,σ, Cu, Cl)
-    #correlation matrix
-    V = zeros(2N, 2N)
+function overlap_community(N,M,C,o)
+    #generate uptake
+    covar = zeros(N,N)
+    covar .= o
+    covar[diagind(covar)] .= 1.0
+
+    means = zeros(N)
+    means .= quantile(Normal(), C)
+
+    mv = MultivariateNormal(means,covar)
+
+    U = rand(mv,M) .> 0
+    U[:,rand(1:M,rand(1:M))] .= 0 #some resources not consumed
     
-    for i = 1:2N
-        for j = 1:2N
-            if i == j
-                V[i,j] = σ[1]
-            elseif (i <= N) & (j <= N)
-                #uptake - uptake
-                V[i,j] = σ[2]
-            elseif (i > N) & (j > N)
-                #leakage - leakage
-                V[i,j] = σ[3]
-            else
-                #leakage - uptake
-                if (i == N + j) | (j == N + i)
-                    #self uptake-leakage correlation
-                    V[i,j] = σ[4]
-                else
-                    V[i,j] = σ[5]
-                end
-            end
-        end
-    end
+    D =  Float64.(rand(M,M) .< C) 
+    # D[:,rand(1:M,rand(1:M))] .= 0 #some resources not leaked
+    [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
+    D[isnan.(D)] .= 0.0
 
-    dMv = MultivariateNormal(V)
-    x = rand(dMv, M)
-    U = cdf.(Normal(), x[1:N,:]) .* (rand(N,M) .< Cu)
-    K = cdf.(Normal(), x[N+1:end,:]) .* (rand(N,M) .< Cl)
-
-    #input and output
-    K[:,1] .= 0.0
-    U[:,end] .= 0.0
-
-    return(Community(N,M,U,K))
+    return(Community(N,M,U,D))
 end
 
-function check_community(c::Community)
+# function comp_community(N,M,C,a)
+#     U = Float64.(rand(N,M) .< C)
 
-    #every consumer has a resource
-    cindx = sum(c.U, dims = 2)[:] .!= 0
-    #every resource has a producer
-    rindx = sum(c.L, dims = 1)[:] .!= 0
+#     for i = 1:N
+#         s = sum(U[i,:])
+#         sp_id = rand(findall(U[i,:] .!= 0)) 
+#         #set all
+#         U[i,:] .*= (1-a)*s / (s-1)
+#         #set specialism
+#         U[i, sp_id] = a*s
+#     end
 
-    U = c.U[cindx,rindx]
-    K = c.L[cindx,rindx]
-    K[:,rand(1:sum(rindx))] .= 0.0
+#     D =  Float64.(rand(M,M) .< C)
+#     # D[:,1] .= 0
+#     [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
 
-    return(Community(sum(cindx),sum(rindx),U,K))
+#     return(Community(N,M,U,D))
+# end
+
+# ##Trophic coherence
+# function coherence_D(M,λd,h,T)
+#     #create skeleton
+#     TL = fill(-Inf,M)
+#     TL[1] = 1
+    
+#     #add iteratively to D-matrix
+#     D = zeros(M,M)
+#     for i = 2:M
+#         ind = 1:(i-1)
+#         #choose base
+#         pb = (TL[ind] / maximum(TL[ind])) .^ h
+#         b = sample(ind, Weights(pb[ind]))
+#         D[b,i] = 1
+#         TL[i] = TL[b] + 1
+#     end
+    
+#     #sort by TL
+#     TLind = sortperm(TL)
+#     D = D[TLind, TLind]
+#     TL = TL[TLind]
+    
+#     #add extra links
+#     k = rand(Poisson(λd), M)
+#     x = TL .- TL'
+#     pl = exp.(-abs.(x .- 1)/ T)
+#     pl[findall(D .== 1)] .= 0
+#     pl[diagind(pl)] .= 0
+#     pl .+= eps() 
+    
+#     for i = 2:M
+#         D[sample(1:M, Weights(pl[i,:]), min(M,k[i]), replace = false), i] .= 1
+#     end
+    
+#     return(D)
+# end
+
+# function coherent_community(N,M,a, λd, h, T)
+#     U = zeros(N,M)
+#     for i = 1:N
+#         U[i,rand( findall(sum(U,dims=1)[:] .== 0) )] = 1 
+#     end
+#     U = U .+ a*rand(N,M) / M
+#     U .= U ./ sum(U)
+
+    
+#     D = coherence_D(M,λd,h,T)
+#     [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
+#     D[isnan.(D)] .= 0.0
+
+#     return(Community(N,M,U,D))
+# end
+
+# # function niche_model(N,M,D,Cu,Cl)
+# #     ci = [rand(D) for i = 1:N]
+# #     ci = ci[sortperm(sum.(ci))]
+
+# #     ca = [rand(D) for i = 1:M]
+# #     ca = ca[sortperm(sum.(ca))]
+
+# #     β = (1/Cu) - 1
+
+# #     U = MiCRM_stability.generate_U_mat(N,M,ci,ca, MiCRM_stability.d_manhat, β)
+# #     L = MiCRM_stability.generate_L_mat(M,ca, MiCRM_stability.d_manhat, Cl)
+
+# #     return(Community(N,M,U,L))
+# # end
+
+# # """
+# #     rand_model(N,M, C = 0.3)
+
+# # generate a uniform random community with a given connectance value
+# # """
+# # function rand_model(N,M, μ, σ, Cu, Cl)
+# #     dMn = MultivariateNormal(μ,σ)
+# #     x = rand(dMn, max(N,M), M)
+
+# #     U = [cdf(Normal(μ[1],σ[1,1]),y[1]) for y = x[1:N,1:M]]
+# #     L = [cdf(Normal(μ[2],σ[2,2]),y[2]) for y = x[1:M,1:M]]
+    
+# #     U = U .* (rand(N,M) .< Cu)
+# #     L = L .* (rand(M,M) .< Cl)
+# #     # U = 
+
+# #     # for i = 1:M
+# #     #     L[i,:] .= L[i,:] ./ sum(L[i,:])
+# #     # end
+
+# #     return Community(N,M,U,L)
+# # end
+
+# # function correlated_rand_model(N,M,σ, Cu, Cl)
+# #     #correlation matrix
+# #     V = zeros(2N, 2N)
+    
+# #     for i = 1:2N
+# #         for j = 1:2N
+# #             if i == j
+# #                 V[i,j] = σ[1]
+# #             elseif (i <= N) & (j <= N)
+# #                 #uptake - uptake
+# #                 V[i,j] = σ[2]
+# #             elseif (i > N) & (j > N)
+# #                 #leakage - leakage
+# #                 V[i,j] = σ[3]
+# #             else
+# #                 #leakage - uptake
+# #                 if (i == N + j) | (j == N + i)
+# #                     #self uptake-leakage correlation
+# #                     V[i,j] = σ[4]
+# #                 else
+# #                     V[i,j] = σ[5]
+# #                 end
+# #             end
+# #         end
+# #     end
+
+# #     dMv = MultivariateNormal(V)
+# #     x = rand(dMv, M)
+# #     U = cdf.(Normal(), x[1:N,:]) .* (rand(N,M) .< Cu)
+# #     K = cdf.(Normal(), x[N+1:end,:]) .* (rand(N,M) .< Cl)
+
+# #     #input and output
+# #     K[:,1] .= 0.0
+# #     U[:,end] .= 0.0
+
+# #     return(Community(N,M,U,K))
+# # end
+
+# # function check_community(c::Community)
+
+# #     #every consumer has a resource
+# #     cindx = sum(c.U, dims = 2)[:] .!= 0
+# #     #every resource has a producer
+# #     rindx = sum(c.L, dims = 1)[:] .!= 0
+
+# #     U = c.U[cindx,rindx]
+# #     K = c.L[cindx,rindx]
+#     K[:,rand(1:sum(rindx))] .= 0.0
+
+#     return(Community(sum(cindx),sum(rindx),U,K))
 
 
-end
+# end
 # #distance
 # du(a,b) = sqrt(sum((a .- b).^2))
 # dl(a,b) = a < b ? sqrt(sum((a .- b).^2)) : Inf

@@ -15,22 +15,19 @@ struct structural_params
     η::Matrix{Float64} #prop of leakage gain from consumer i
 
     χ::Matrix{Float64} #prop of substrate gain from resource a
-    ϕ::Matrix{Float64} #prop of waste product to resource a
-    ψ::Array{Float64} #prop of product of a released as b
+    ϕ::Vector{Matrix{Float64}} #prop of waste product of b from uptake of a by i
 end
 
 struct exponential_params
     #consumer growth
     gx::Vector{Float64} #growth to consumer
     gs::Vector{Float64} #growth to substrates
-    gw::Vector{Float64} #growth to waste products
     
     #consumer mortality
     mx::Vector{Float64} #mortality to consumer
     
     #consumer uptake + leakage stochiometry
     fy::Matrix{Float64} #substrate proportion to resource
-    hy::Matrix{Float64} #waste proportion to resource
 
     #Leakage structure
     λy::Matrix{Float64} #total leakage to resources
@@ -40,47 +37,12 @@ struct exponential_params
     oy::Vector{Float64}
 end
 
-#stores precalculated values
-struct util_params
-    py::Array{Float64} #y - derivatives of p_ia
-    wy::Matrix{Float64} #derivatives of waste product
-end
-
-#fucntion to precalculate
-function util_params(N::Int64, M::Int64, s::structural_params, e::exponential_params)
-    py = similar(s.ψ)
-    wy = similar(s.ϕ)
-
-    for i = 1:N
-        for a = 1:M
-            for b = 1:M
-                #d p_ia / d y_b
-                py[i,a,b] = e.fy[i,b] * (s.ψ[i,b,a] - s.χ[i,b])
-            end
-        end
-    end
-
-    for i = 1:N
-        for a = 1:M
-            #dw_i / d_ya
-            wy[i,a] = s.ϕ[i,a] * e.hy[i,a]
-            for b = 1:M
-             #dw_i / d_ya
-             wy[i,a] +=  s.ϕ[i,b] * py[i,b,a]
-            end
-        end
-    end
-
-    return(util_params(py,wy))
-end
-
-
 struct Parameters
     N::Int64 #number of consumers
     M::Int64 #number of resources
     s::structural_params
     e::exponential_params
-    u::util_params
+    tmp::Vector{Matrix{Float64}}
 end
 
 #struct for storing communtiy uptake and leakage matricies
