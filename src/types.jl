@@ -15,7 +15,7 @@ struct structural_params
     η::Matrix{Float64} #prop of leakage gain from consumer i
 
     χ::Matrix{Float64} #prop of substrate gain from resource a
-    ϕ::Vector{Matrix{Float64}} #prop of waste product of b from uptake of a by i
+    ϕ::Matrix{Vector{Float64}} #prop of waste product of b from uptake of a by i
 end
 
 struct exponential_params
@@ -42,7 +42,6 @@ struct Parameters
     M::Int64 #number of resources
     s::structural_params
     e::exponential_params
-    tmp::Vector{Matrix{Float64}}
 end
 
 #struct for storing communtiy uptake and leakage matricies

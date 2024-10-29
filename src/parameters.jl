@@ -4,50 +4,65 @@ function get_structural_params(U::Matrix{Float64},D::Matrix{Float64}, Λ::Vector
     #get K topology
     K = diagm(Λ) * U * D
 
+    χ = zeros(N,M)
+    γ = zeros(N,M)
+    η = zeros(N,M)
+
     #uptake branching terms
-    χ = U ./ (norm.(eachrow(U), 1)) #resources to consumer uptake
-    γ = U ./ (norm.(eachcol(U), 1)') #consumers to resource loss
+    for i = 1:N
+        χ[i,:] .= sum(U[i,:]) > 0 ? U[i,:] ./ sum(U[i,:]) : 0.0 #resources to consumer uptake
+    end
+    for a = 1:M
+        γ[:,a] .= sum(U[:,a]) > 0 ? U[:,a] ./ sum(U[:,a]) : 0.0 #consumers to resource loss
+        η[:,a] .= sum(K[:,a]) > 0 ? K[:,a] ./ sum(K[:,a]) : 0.0 #consumers to resource gain
+    end
+
     #release branching
-    η = K ./ (norm.(eachcol(K), 1)') #consumers to resource gain
-
-    γ[isnan.(γ)] .= 0.0 
-    χ[isnan.(χ)] .= 0.0 
-    η[isnan.(η)] .= 0.0 
-
     #get inflow outflow
     #calculate excess flux
     EF = sum(K,dims=1)[:] .- sum(U,dims=1)[:]
-   
-
+    
     external = hcat([EF[a] < 0 ? [abs(EF[a])*(1 + extF), abs(EF[a])*extF] : [abs(EF[a])*extF, abs(EF[a])*(1 + extF)] for a = 1:M]...)
     
     ρ = external[1,:] ./ (external[1,:] .+ sum(K,dims=1)[:])
-    ρ̃ = 1 .- ρ
-   
     σ = external[2,:] ./ (external[2,:] .+ sum(U,dims=1)[:])
+    ρ̃ = 1 .- ρ
     σ̃ = 1 .- σ
-   
-   
-    ρ[isnan.(ρ)] .= 0.0
-    ρ̃[isnan.(ρ̃)] .= 0.0
-    σ[isnan.(σ)] .= 0.0
-    σ̃[isnan.(σ̃)] .= 0.0
 
-    #structural
+    for a = 1:M
+        if isnan(ρ[a])
+            ρ[a] = 0.0
+            ρ̃[a] = 0.0
+        end  
+        if isnan(σ[a])
+            σ[a] = 0.0
+            σ̃[a] = 0.0
+        end  
+    end
+
+    # #structural
     α = sum(U,dims=2)[:]
-    β = (external[1,:] .+ sum(K,dims=1)[:])
+    α = α ./ mean(α)
 
-    ϕ = [zeros(M,M) for i = 1:N]
+    β = (external[1,:] .+ sum(K,dims=1)[:])
+    β = β ./ mean(β)
+
+    ϕ = Matrix{Vector{Float64}}(undef,N,M)
+    pmat = χ * D
+    #match indexing in SI
     for i = 1:N
-        for a = 1:M
-            for b = 1:M
-                ϕ[i][a,b] = (χ[i,b] * D[b,a]) 
+            for a = 1:M
+                ϕ[i,a] = zeros(M)
+                if pmat[i,a] > 0
+                    for b = 1:M
+                        ϕ[i,a][b] = (χ[i,b] * D[b,a])/ pmat[i,a]
+                    end     
+                end
             end
-        end
     end 
-    #normalise
-    [ϕ[i][a,:] .= ϕ[i][a,:]  / sum(ϕ[i][a,:] ) for i = 1:N, a = 1:M]
-    [x[isnan.(x)] .= 0.0 for x = ϕ]
+
+    # #normalise
+    # [ϕ[i,a] .= sum(ϕ[i,a]) > 0 ? ϕ[i,a]  / sum(ϕ[i,a]) : ϕ[i,a] for i = 1:N, a = 1:M]
 
     return MiCRM_stability.structural_params(α,β,Λ,ρ,ρ̃,σ,σ̃,γ,η,χ,ϕ);
 end
@@ -119,6 +134,5 @@ get_exponential_parameters(c::Community) = get_exponential_parameters(c.N, c.M)
 function get_parameters(c::Community, Λ::Vector{Float64},extF::Float64)
     Parameters(c.N,c.M, 
     get_structural_params(c,Λ,extF), 
-    get_exponential_parameters(c),
-    [])
+    get_exponential_parameters(c))
 end

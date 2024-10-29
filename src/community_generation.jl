@@ -1,36 +1,173 @@
-function random_community(N,M,C)
-    U = Float64.(rand(N,M) .< C) 
-    U[:,rand(1:M,rand(1:M))] .= 0 #some resources not consumed
+function random_community(N,M,Cu,Cd)
+    U = Float64.(rand(N,M) .< Cu) 
+    #evey consumer has a link
+    for i = 1:N
+        if sum(U[i,:]) == 0
+            U[i, rand(1:M)] = 1
+        end
+    end
+    D =  Float64.(rand(M,M) .< Cd) 
     
-    D =  Float64.(rand(M,M) .< C) 
-    # D[:,rand(1:M,rand(1:M))] .= 0 #some resources not leaked
     [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
     D[isnan.(D)] .= 0.0
 
     return(Community(N,M,U,D))
 end
 
-function overlap_community(N,M,C,o)
-    #generate uptake
-    covar = zeros(N,N)
-    covar .= o
-    covar[diagind(covar)] .= 1.0
 
-    means = zeros(N)
-    means .= quantile(Normal(), C)
 
-    mv = MultivariateNormal(means,covar)
+"""
+    nested_community(N,M,κ,v, Cd)
 
-    U = rand(mv,M) .> 0
-    U[:,rand(1:M,rand(1:M))] .= 0 #some resources not consumed
-    
-    D =  Float64.(rand(M,M) .< C) 
+Creates a nested `Communtiy` object with N consumers and M resources. The leakage matrix is random. `κ` is the exponent controling the distribution of node degrees and `v` the strength of attraction to high degree nodes. in this way `v` controls the nestedness. 
+"""
+function nested_community(N,M, k, v, Cd)
+    U = zeros(N,M)
+
+    p = (1:M) .^ -k
+    p = p ./ sum(p)
+
+    #sample numbers of resources and sort
+    kU = sample(1:M, Weights(p), N, replace = true) |> sort |> reverse
+    #loop over consumers
+    for i = 1:N
+        #number of links
+        Z = kU[i]
+        #get prob based on other consumption
+        #v - controls the strength of attraction
+        nj = (sum(U,dims=1)[:] .+ 1) .^ v
+        p = nj ./ sum(nj)
+        #sample multinomial
+        U[i,sample(1:M, Weights(p), Z, replace = false)] .= 1.0     
+    end
+    #order by number of links
+    ind = sortperm(sum(U .> 0, dims = 1)[:], rev = true)
+
+    # U[:,rand(1:M,rand(1:M))] .= 0
+
+    #random uptake matrix
+    D =  Float64.(rand(M,M) .< Cd) 
     # D[:,rand(1:M,rand(1:M))] .= 0 #some resources not leaked
+    [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
+    D[isnan.(D)] .= 0.0
+
+    return(MiCRM_stability.Community(N,M,U[:,ind],D))
+end
+
+"""
+    modular_community(N,M,C,Nclass,r)
+
+Creates a modular communtiy 
+"""
+function modular_community(N,M,C,Nclass,r)
+    Mc = M ÷ Nclass
+    Ci = (C*M) / (Mc + r*(M - Mc))
+    Co = r*Ci
+
+    res_class = repeat(collect(1:Nclass), inner = M ÷ Nclass)
+    rclass = Dict(i => findall(res_class .== i) for i = 1:Nclass)
+
+    #Consumers
+    U = zeros(N,M)
+    con_class = zeros(N)
+    for i = 1:N
+            con_class[i] = rand(1:(Nclass))
+            U[i,:] .= rand(M) .< Co
+            U[i, rclass[con_class[i]],:] .= rand(length(rclass[con_class[i]])) .< Ci
+        # end
+    end
+
+    U = U[sortperm(con_class),:]
+
+    D = zeros(M,M)
+    for a = 1:M
+        #all leakage
+        D[a, :] .= rand(M) .< Co
+        #leakage to waste
+        #leakage to same group
+        D[a, rclass[res_class[a]]] .= rand(length(rclass[res_class[a]])) .< Ci
+    end
+
+    D = D[sortperm(res_class),:]
+    [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
+
+    return(Community(N,M, U, D))
+
+end
+
+
+# ##Trophic coherence
+function coherence_D(M,λd,h,T)
+    #create skeleton
+    TL = fill(-Inf,M)
+    TL[1] = 1
+    
+    #add iteratively to D-matrix
+    D = zeros(M,M)
+    for i = 2:M
+        ind = 1:(i-1)
+        #choose base
+        pb = (TL[ind] / maximum(TL[ind])) .^ h
+        b = sample(ind, Weights(pb[ind]))
+        D[b,i] = 1
+        TL[i] = TL[b] + 1
+    end
+    
+    #sort by TL
+    TLind = sortperm(TL)
+    D = D[TLind, TLind]
+    TL = TL[TLind]
+    
+    #add extra links
+    k = rand(Poisson(λd), M)
+    x = TL .- TL'
+    pl = exp.(-abs.(x .- 1)/ T)
+    pl[findall(D .== 1)] .= 0
+    pl[diagind(pl)] .= 0
+    pl .+= eps() 
+    
+    for i = 2:M
+        D[sample(1:M, Weights(pl[i,:]), min(M,k[i]), replace = false), i] .= 1
+    end
+    
+    return(D)
+end
+
+function coherent_community(N,M, λd, h, T)
+    U = zeros(N,M)
+    for i = 1:N
+        U[i,rand(findall(sum(U,dims=1)[:] .== 0) )] = 1 
+    end
+    
+    D = coherence_D(M,λd,h,T)
     [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
     D[isnan.(D)] .= 0.0
 
     return(Community(N,M,U,D))
 end
+
+
+# function overlap_community(N,M,C,o)
+#     #generate uptake
+#     covar = zeros(N,N)
+#     covar .= o
+#     covar[diagind(covar)] .= 1.0
+
+#     means = zeros(N)
+#     means .= quantile(Normal(), C)
+
+#     mv = MultivariateNormal(means,covar)
+
+#     U = rand(mv,M) .> 0
+#     U[:,rand(1:M,rand(1:M))] .= 0 #some resources not consumed
+    
+#     D =  Float64.(rand(M,M) .< C) 
+#     # D[:,rand(1:M,rand(1:M))] .= 0 #some resources not leaked
+#     [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
+#     D[isnan.(D)] .= 0.0
+
+#     return(Community(N,M,U,D))
+# end
 
 # function comp_community(N,M,C,a)
 #     U = Float64.(rand(N,M) .< C)
@@ -51,58 +188,6 @@ end
 #     return(Community(N,M,U,D))
 # end
 
-# ##Trophic coherence
-# function coherence_D(M,λd,h,T)
-#     #create skeleton
-#     TL = fill(-Inf,M)
-#     TL[1] = 1
-    
-#     #add iteratively to D-matrix
-#     D = zeros(M,M)
-#     for i = 2:M
-#         ind = 1:(i-1)
-#         #choose base
-#         pb = (TL[ind] / maximum(TL[ind])) .^ h
-#         b = sample(ind, Weights(pb[ind]))
-#         D[b,i] = 1
-#         TL[i] = TL[b] + 1
-#     end
-    
-#     #sort by TL
-#     TLind = sortperm(TL)
-#     D = D[TLind, TLind]
-#     TL = TL[TLind]
-    
-#     #add extra links
-#     k = rand(Poisson(λd), M)
-#     x = TL .- TL'
-#     pl = exp.(-abs.(x .- 1)/ T)
-#     pl[findall(D .== 1)] .= 0
-#     pl[diagind(pl)] .= 0
-#     pl .+= eps() 
-    
-#     for i = 2:M
-#         D[sample(1:M, Weights(pl[i,:]), min(M,k[i]), replace = false), i] .= 1
-#     end
-    
-#     return(D)
-# end
-
-# function coherent_community(N,M,a, λd, h, T)
-#     U = zeros(N,M)
-#     for i = 1:N
-#         U[i,rand( findall(sum(U,dims=1)[:] .== 0) )] = 1 
-#     end
-#     U = U .+ a*rand(N,M) / M
-#     U .= U ./ sum(U)
-
-    
-#     D = coherence_D(M,λd,h,T)
-#     [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
-#     D[isnan.(D)] .= 0.0
-
-#     return(Community(N,M,U,D))
-# end
 
 # # function niche_model(N,M,D,Cu,Cl)
 # #     ci = [rand(D) for i = 1:N]
