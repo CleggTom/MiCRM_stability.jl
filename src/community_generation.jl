@@ -6,8 +6,11 @@ function random_community(N,M,Cu,Cd)
             U[i, rand(1:M)] = 1
         end
     end
+    #normalise consumer uptakes to 1
+    [U[i,:] .= U[i,:] ./ sum(U[i,:]) for i = 1:N]
+    U[isnan.(U)] .= 0.0
+
     D =  Float64.(rand(M,M) .< Cd) 
-    
     [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
     D[isnan.(D)] .= 0.0
 

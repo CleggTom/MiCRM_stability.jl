@@ -1,4 +1,4 @@
-function get_structural_params(U::Matrix{Float64},D::Matrix{Float64}, Λ::Vector{Float64}, extF::Float64)
+function get_structural_params(U::Matrix{Float64},D::Matrix{Float64}, Λ::Vector{Float64})
     N,M = size(U)
 
     #get K topology
@@ -17,35 +17,14 @@ function get_structural_params(U::Matrix{Float64},D::Matrix{Float64}, Λ::Vector
         η[:,a] .= sum(K[:,a]) > 0 ? K[:,a] ./ sum(K[:,a]) : 0.0 #consumers to resource gain
     end
 
-    #release branching
-    #get inflow outflow
-    #calculate excess flux
-    EF = sum(K,dims=1)[:] .- sum(U,dims=1)[:]
-    
-    external = hcat([EF[a] < 0 ? [abs(EF[a])*(1 + extF), abs(EF[a])*extF] : [abs(EF[a])*extF, abs(EF[a])*(1 + extF)] for a = 1:M]...)
-    
-    ρ = external[1,:] ./ (external[1,:] .+ sum(K,dims=1)[:])
-    σ = external[2,:] ./ (external[2,:] .+ sum(U,dims=1)[:])
+    ρ = rand(M)
+    σ = rand(M)
     ρ̃ = 1 .- ρ
     σ̃ = 1 .- σ
 
-    for a = 1:M
-        if isnan(ρ[a])
-            ρ[a] = 0.0
-            ρ̃[a] = 0.0
-        end  
-        if isnan(σ[a])
-            σ[a] = 0.0
-            σ̃[a] = 0.0
-        end  
-    end
-
     # #structural
     α = sum(U,dims=2)[:]
-    α = α ./ mean(α)
-
-    β = (external[1,:] .+ sum(K,dims=1)[:])
-    β = β ./ mean(β)
+    β = sum(U,dims=1)[:]
 
     ϕ = Matrix{Vector{Float64}}(undef,N,M)
     pmat = χ * D
@@ -67,7 +46,7 @@ function get_structural_params(U::Matrix{Float64},D::Matrix{Float64}, Λ::Vector
     return MiCRM_stability.structural_params(α,β,Λ,ρ,ρ̃,σ,σ̃,γ,η,χ,ϕ);
 end
 
-get_structural_params(c::Community, Λ::Vector{Float64}, extF::Float64) = get_structural_params(c.U, c.D, Λ, extF)
+get_structural_params(c::Community, Λ::Vector{Float64}, extF::Float64) = get_structural_params(c.U, c.D, Λ)
 
 
 
