@@ -18,6 +18,36 @@ function random_community(N,M,Cu,Cd)
 end
 
 
+function sbm_community(N, M, np, Up, Dp)
+    @assert size(Up) == (np,np)
+    @assert size(Dp) == (np,np)
+
+    #allocate matricies
+    U = zeros(N,M)
+    D = zeros(M,M)
+
+    #allocate group
+    cc = rand(1:np, N)
+    cr = rand(1:np, M)
+
+    #generate U
+    for i = 1:N
+        for a = 1:M
+            U[i,a] = rand() < Up[cc[i],cr[a]] ? 1 : 0
+        end
+    end
+
+    for a = 1:M
+        for b = 1:M
+            D[a,b] = rand() < Dp[cr[a], cr[b]] ? 1 : 0
+        end
+    end
+
+    c = sortperm(cc)
+    r = sortperm(cr)
+
+    return(Community(N,M,U[c,r],D[r,r]))
+end
 
 """
     nested_community(N,M,κ,v, Cd)
@@ -78,17 +108,6 @@ function modular_community(N,M,C,Nclass,r)
             U[i,:] .= rand(M) .< Co
             U[i, rclass[con_class[i]],:] .= rand(length(rclass[con_class[i]])) .< Ci
         # end
-    end
-
-    U = U[sortperm(con_class),:]
-
-    D = zeros(M,M)
-    for a = 1:M
-        #all leakage
-        D[a, :] .= rand(M) .< Co
-        #leakage to waste
-        #leakage to same group
-        D[a, rclass[res_class[a]]] .= rand(length(rclass[res_class[a]])) .< Ci
     end
 
     D = D[sortperm(res_class),:]

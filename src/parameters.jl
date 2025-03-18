@@ -3,12 +3,12 @@ function get_structural_params(U::Matrix{Float64},D::Matrix{Float64}, Λ::Vector
 
     #get K topology
     K = diagm(Λ) * U * D
-
+    
+    #branching terms
     χ = zeros(N,M)
     γ = zeros(N,M)
     η = zeros(N,M)
 
-    #uptake branching terms
     for i = 1:N
         χ[i,:] .= sum(U[i,:]) > 0 ? U[i,:] ./ sum(U[i,:]) : 0.0 #resources to consumer uptake
     end
@@ -17,14 +17,32 @@ function get_structural_params(U::Matrix{Float64},D::Matrix{Float64}, Λ::Vector
         η[:,a] .= sum(K[:,a]) > 0 ? K[:,a] ./ sum(K[:,a]) : 0.0 #consumers to resource gain
     end
 
-    ρ = rand(M)
-    σ = rand(M)
+    #resource inflow/outflow - get the total internal flux for each resource
+    Utot = sum(U, dims = 1)[:]
+    Ktot = sum(K, dims = 1)[:]
+
+    #get minimal external flux possible
+    EF = Utot .- Ktot
+    ρ = zeros(M)
+    σ = zeros(M)
+    for a = 1:M
+        if EF[a] > 0
+            ρ[a] = abs(EF[a]) / (abs(EF[a]) + Ktot[a])
+        elseif EF[a] < 0
+            σ[a] = abs(EF[a]) / (abs(EF[a]) + Utot[a])
+        else
+        end
+    end
+
+    #sample flux balances - add random influx + outflow
+    ρ .+= (1 .- ρ) .* rand(M)
+    σ .+= (1 .- σ) .* rand(M)
     ρ̃ = 1 .- ρ
     σ̃ = 1 .- σ
 
     # #structural
-    α = sum(U,dims=2)[:]
-    β = sum(U,dims=1)[:]
+    α = rand() .+ rand(N) ./ 10
+    β = rand() .+ rand(M) ./ 10
 
     ϕ = Matrix{Vector{Float64}}(undef,N,M)
     pmat = χ * D

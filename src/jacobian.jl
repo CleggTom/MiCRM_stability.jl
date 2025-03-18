@@ -16,46 +16,49 @@ function jacobian!(p::Parameters, J::Matrix{Float64})
         for j = 1:p.N
             #dxi/dxi
             if i == j
-                J[i,i] += p.s.α[i] * (1 - p.s.Λ[i]) * (p.e.gx[i] - p.e.mx[i])
+                J[i,i] = p.s.α[i] * (1 - p.s.Λ[i]) * (p.e.gx[i] - p.e.mx[i])
             end
         end
         
         for a = 1:p.M
             #dxi/dya
-            J[i, a + p.N] += p.s.α[i] * ( 
+            J[i, a + p.N] = p.s.α[i] * ( 
                 (1 - p.s.Λ[i]) * ((p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a])) -
                 (p.s.Λ[i]) * (p.e.λy[i,a])
             )
+            
         end
-
     end
-
     for a = 1:p.M
         for i = 1:p.N
             #dya/dxi
             J[a + p.N, i] += p.s.β[a] * p.e.gx[i] * (
                 p.s.ρ̃[a] * p.s.η[i,a] - p.s.σ̃[a] * p.s.γ[i,a]
             )
-
-            #uptake and leakage terms
-            for b = 1:p.M
-                if a == b
-                    #direct uptake effects
-                    J[a + p.N, a + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * p.e.fy[i,a]
-                end
-                #g/s term - appears in uotake and release
-                J[a + p.N, b + p.N] += (p.s.ρ̃[a] * p.s.η[i,b] - p.s.σ̃[a] * p.s.γ[i,b]) * (p.e.fy[i,b] * p.s.χ[i,b] * (p.e.gs[i] - 1)) 
-                
-                #release direct effect
-                J[a + p.N, b + p.N] +=  p.s.ρ̃[a] * p.s.η[i,b]* (p.e.fy[i,b] * p.s.ϕ[i,a][b] + p.e.λy[i,b])
-            end
         end
 
+        #uptake and leakage
         for b = 1:p.M
-            #dya/dya
+            #external supply and outflow
             if a == b
-                #external supply and outflow
                 J[a + p.N, a + p.N] += p.s.ρ[a] * p.e.iy[a] - p.s.σ[a] * p.e.oy[a]
+            end
+            #internal dynamics
+            for i = 1:p.N
+                #uptake
+                J[a + p.N, b + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (-p.e.fy[i,b] * p.s.χ[i,b] + p.e.gs[i] * p.s.χ[i,b] * p.e.fy[i,b])
+                #direct loss term - diagonal only
+                if a == b
+                    J[a + p.N, b + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * p.e.fy[i,b]
+                end
+                #leakage
+                #direct terms
+                J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * p.s.ϕ[i,b][a] * p.e.fy[i,b]
+                #indirect terms
+                for c = 1:p.M
+                    J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * p.s.ϕ[i,c][a] * (-p.e.fy[i,b] * p.s.χ[i,b]  + p.e.gs[i] * p.e.fy[i,b] * p.s.χ[i,b] + p.e.λy[i,b])
+                end
+            
             end
         end
     end
