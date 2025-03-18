@@ -1,41 +1,52 @@
 struct structural_params
-    #scale params
-    α::Vector{Float64} #scale param for consumers
-    β::Vector{Float64} #scale param for resources
-    Λ::Vector{Float64} #efficency param
+    # Scale params
+    α::Vector{Float64}  # Scale param for consumers
+    β::Vector{Float64}  # Scale param for resources
+    Λ::Vector{Float64}  # Efficiency param
+    Ω::Vector{Float64}  # Precomputed (1 - Λ)
 
-    #branching params
-    ρ::Vector{Float64} #prop of resource gain from inflow
-    ρ̃::Vector{Float64} #prop of resource gain from leakage
-   
-    σ::Vector{Float64} #prop of resource loss from outlfow
-    σ̃::Vector{Float64} #prop of resource loss from uptake
-   
-    γ::Matrix{Float64} #prop of uptake loss from consumer i
-    η::Matrix{Float64} #prop of leakage gain from consumer i
+    # Branching params
+    ρ::Vector{Float64}  # Proportion of resource gain from inflow
+    ρ̃::Vector{Float64}  # Proportion of resource gain from leakage
 
-    χ::Matrix{Float64} #prop of substrate gain from resource a
-    ϕ::Matrix{Vector{Float64}} #prop of waste product of b from uptake of a by i
+    σ::Vector{Float64}  # Proportion of resource loss from outflow
+    σ̃::Vector{Float64}  # Proportion of resource loss from uptake
+
+    γ::Matrix{Float64}  # Proportion of uptake loss from consumer i
+    η::Matrix{Float64}  # Proportion of leakage gain from consumer i
+
+    χ::Matrix{Float64}  # Proportion of substrate gain from resource a
+    ϕ::Array{Float64,3} # Waste product of b from uptake of a by i
+
+    function structural_params(α, β, Λ, ρ, ρ̃, σ, σ̃, γ, η, χ, ϕ)
+        Ω = 1.0 .- Λ  # Precompute (1 - Λ)
+        new(α, β, Λ, Ω, ρ, ρ̃, σ, σ̃, γ, η, χ, ϕ)
+    end
 end
 
 struct exponential_params
-    #consumer growth
-    gx::Vector{Float64} #growth to consumer
-    gs::Vector{Float64} #growth to substrates
+    # Consumer growth
+    gx::Vector{Float64}  # Growth to consumer
+    gs::Vector{Float64}  # Growth to substrates
     
-    #consumer mortality
-    mx::Vector{Float64} #mortality to consumer
+    # Consumer mortality
+    mx::Vector{Float64}  # Mortality to consumer
     
-    #consumer uptake + leakage stochiometry
-    fy::Matrix{Float64} #substrate proportion to resource
+    # Consumer uptake + leakage stoichiometry
+    fy::Matrix{Float64}  # Substrate proportion to resource
 
-    #Leakage structure
-    λy::Matrix{Float64} #total leakage to resources
+    # Leakage structure
+    λy::Matrix{Float64}  # Total leakage to resources
 
-    #external resource dynamics
+    # External resource dynamics
     iy::Vector{Float64}
     oy::Vector{Float64}
+
+    function exponential_params(gx, gs, mx, fy, λy, iy, oy)
+        new(gx, gs, mx, fy, λy, iy, oy)
+    end
 end
+
 
 struct Parameters
     N::Int64 #number of consumers

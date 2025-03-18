@@ -44,16 +44,17 @@ function get_structural_params(U::Matrix{Float64},D::Matrix{Float64}, Λ::Vector
     α = rand() .+ rand(N) ./ 10
     β = rand() .+ rand(M) ./ 10
 
-    ϕ = Matrix{Vector{Float64}}(undef,N,M)
+    ϕ = Array{Float64, 3}(undef,N,M,M)
     pmat = χ * D
     #match indexing in SI
     for i = 1:N
             for a = 1:M
-                ϕ[i,a] = zeros(M)
                 if pmat[i,a] > 0
                     for b = 1:M
-                        ϕ[i,a][b] = (χ[i,b] * D[b,a])/ pmat[i,a]
-                    end     
+                        ϕ[i,a,b] = (χ[i,b] * D[b,a])/ pmat[i,a]
+                    end  
+                else
+                    ϕ[i,a,:] .= 0.0   
                 end
             end
     end 

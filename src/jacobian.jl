@@ -8,61 +8,108 @@
 #     return(res)
 # end
 
-#jacobian
+# Optimized Jacobian function with reduced setindex! operations
 function jacobian!(p::Parameters, J::Matrix{Float64})
     J .= 0
-    #loop over consumers
-    for i = 1:p.N
+    # Loop over consumers
+    @inbounds for i = 1:p.N
+        α_i = p.s.α[i]
+        Ω_i = p.s.Ω[i]
+        gx_i = p.e.gx[i]
+        mx_i = p.e.mx[i]
+        gs_i = p.e.gs[i]
+        Λ_i = p.s.Λ[i]
+        
         for j = 1:p.N
-            #dxi/dxi
+            # dxi/dxi
             if i == j
-                J[i,i] = p.s.α[i] * (1 - p.s.Λ[i]) * (p.e.gx[i] - p.e.mx[i])
+                @fastmath J[i, i] = α_i * Ω_i * (gx_i - mx_i)
             end
         end
         
         for a = 1:p.M
-            #dxi/dya
-            J[i, a + p.N] = p.s.α[i] * ( 
-                (1 - p.s.Λ[i]) * ((p.e.gs[i] * p.s.χ[i,a] * p.e.fy[i,a])) -
-                (p.s.Λ[i]) * (p.e.λy[i,a])
-            )
+            χ_ia = p.s.χ[i, a]
+            fy_ia = p.e.fy[i, a]
+            λy_ia = p.e.λy[i, a]
             
+            # dxi/dya
+            @fastmath J[i, a + p.N] = α_i * (
+                Ω_i * (gs_i * χ_ia * fy_ia) -
+                Λ_i * λy_ia
+            )
         end
     end
-    for a = 1:p.M
+
+    @inbounds for a = 1:p.M
+        β_a = p.s.β[a]
+        ρ̃_a = p.s.ρ̃[a]
+        σ̃_a = p.s.σ̃[a]
+        ρ_a = p.s.ρ[a]
+        σ_a = p.s.σ[a]
+        iy_a = p.e.iy[a]
+        oy_a = p.e.oy[a]
+        
         for i = 1:p.N
-            #dya/dxi
-            J[a + p.N, i] += p.s.β[a] * p.e.gx[i] * (
-                p.s.ρ̃[a] * p.s.η[i,a] - p.s.σ̃[a] * p.s.γ[i,a]
-            )
+            η_ia = p.s.η[i, a]
+            γ_ia = p.s.γ[i, a]
+            gx_i = p.e.gx[i]
+            
+            # dya/dxi
+            @fastmath J[a + p.N, i] += β_a * gx_i * (ρ̃_a * η_ia - σ̃_a * γ_ia)
         end
 
-        #uptake and leakage
-        for b = 1:p.M
-            #external supply and outflow
-            if a == b
-                J[a + p.N, a + p.N] += p.s.ρ[a] * p.e.iy[a] - p.s.σ[a] * p.e.oy[a]
-            end
-            #internal dynamics
-            for i = 1:p.N
-                #uptake
-                J[a + p.N, b + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * (-p.e.fy[i,b] * p.s.χ[i,b] + p.e.gs[i] * p.s.χ[i,b] * p.e.fy[i,b])
-                #direct loss term - diagonal only
-                if a == b
-                    J[a + p.N, b + p.N] -= p.s.σ̃[a] * p.s.γ[i,a] * p.e.fy[i,b]
-                end
-                #leakage
-                #direct terms
-                J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * p.s.ϕ[i,b][a] * p.e.fy[i,b]
-                #indirect terms
-                for c = 1:p.M
-                    J[a + p.N, b + p.N] += p.s.ρ̃[a] * p.s.η[i,a] * p.s.ϕ[i,c][a] * (-p.e.fy[i,b] * p.s.χ[i,b]  + p.e.gs[i] * p.e.fy[i,b] * p.s.χ[i,b] + p.e.λy[i,b])
-                end
+        # Uptake and leakage
+        @inbounds @simd for b = 1:p.M
+            idx = a + p.N  # Precompute row index
             
+            # External supply and outflow
+            if a == b
+                @fastmath J[idx, idx] += ρ_a * iy_a - σ_a * oy_a
+            end
+            
+            # Internal dynamics
+            for i = 1:p.N
+                γ_ia = p.s.γ[i, a]
+                η_ia = p.s.η[i, a]
+                gs_i = p.e.gs[i]
+                
+                fy_ib = p.e.fy[i, b]
+                χ_ib = p.s.χ[i, b]
+                λy_ib = p.e.λy[i, b]
+                
+                uptake_term = σ̃_a * γ_ia * (-fy_ib * χ_ib + gs_i * χ_ib * fy_ib)
+                leakage_direct = ρ̃_a * η_ia * p.s.ϕ[i, b, a] * fy_ib
+                
+                # Use a temporary buffer to accumulate results
+                temp_J = J[idx, b + p.N] - uptake_term
+                
+                # Direct loss term - diagonal only
+                if a == b
+                    temp_J -= σ̃_a * γ_ia * fy_ib
+                end
+                
+                # Leakage
+                temp_J += leakage_direct
+                
+                # Indirect terms
+                @inbounds for c = 1:p.M
+                    ϕ_ic_a = p.s.ϕ[i, c, a]
+                    indirect_leakage = ρ̃_a * η_ia * ϕ_ic_a * (-fy_ib * χ_ib + gs_i * fy_ib * χ_ib + λy_ib)
+                    temp_J += indirect_leakage
+                end
+                
+                # Single assignment to J to minimize setindex! overhead
+                J[idx, b + p.N] = temp_J
             end
         end
     end
 end
+
+
+
+
+
+
 
 ##Metrics
 function gc!(G, J, x0)
