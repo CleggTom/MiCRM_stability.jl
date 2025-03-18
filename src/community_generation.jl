@@ -17,6 +17,36 @@ function random_community(N,M,Cu,Cd)
     return(Community(N,M,U,D))
 end
 
+function spec_community(N,M,pc,pr,wc,wr)
+    U = zeros(N,M)
+    D = zeros(M,M)
+    #evey consumer has a link
+    for i = 1:N
+        if rand() < pc
+            U[i,sample(1:M, 1)] .= 1
+        else
+            U[i,sample(1:M, wc)] .= 1
+        end
+    end
+
+    [U[i,:] .= U[i,:] ./ sum(U[i,:]) for i = 1:N]
+    U[isnan.(U)] .= 0.0
+
+    for a = 1:M
+        if rand() < pr
+            D[a,sample(1:M, 1)] .= 1
+        else
+            D[a,sample(1:M, wr)] .= 1
+        end
+    end
+        
+    
+    [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
+    D[isnan.(D)] .= 0.0
+
+    return(MiCRM_stability.Community(N,M,U,D))
+end
+
 
 function sbm_community(N, M, np, Up, Dp)
     @assert size(Up) == (np,np)
