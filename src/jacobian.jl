@@ -20,23 +20,17 @@ function jacobian!(p::Parameters, J::Matrix{Float64})
         gs_i = p.e.gs[i]
         Λ_i = p.s.Λ[i]
         
-        for j = 1:p.N
-            # dxi/dxi
-            if i == j
-                @fastmath J[i, i] = α_i * Ω_i * (gx_i - mx_i)
-            end
-        end
-        
+        #consumer intraspecific element
+        @fastmath J[i, i] = α_i * Ω_i * (gx_i - mx_i)
+
+        #consumer to resources
         for a = 1:p.M
             χ_ia = p.s.χ[i, a]
             fy_ia = p.e.fy[i, a]
             λy_ia = p.e.λy[i, a]
             
             # dxi/dya
-            @fastmath J[i, a + p.N] = α_i * (
-                Ω_i * (gs_i * χ_ia * fy_ia) -
-                Λ_i * λy_ia
-            )
+            @fastmath J[i, a + p.N] = α_i * Ω_i * ( (gs_i * χ_ia * fy_ia) - Λ_i * λy_ia)
         end
     end
 
@@ -49,6 +43,7 @@ function jacobian!(p::Parameters, J::Matrix{Float64})
         iy_a = p.e.iy[a]
         oy_a = p.e.oy[a]
         
+        #resource to consumer
         for i = 1:p.N
             η_ia = p.s.η[i, a]
             γ_ia = p.s.γ[i, a]
@@ -78,8 +73,6 @@ function jacobian!(p::Parameters, J::Matrix{Float64})
                 λy_ib = p.e.λy[i, b]
                 
                 uptake_term = σ̃_a * γ_ia * (-fy_ib * χ_ib + gs_i * χ_ib * fy_ib)
-                leakage_direct = ρ̃_a * η_ia * p.s.ϕ[i, b, a] * fy_ib
-                
                 # Use a temporary buffer to accumulate results
                 temp_J = J[idx, b + p.N] - uptake_term
                 
@@ -89,6 +82,7 @@ function jacobian!(p::Parameters, J::Matrix{Float64})
                 end
                 
                 # Leakage
+                leakage_direct = ρ̃_a * η_ia * p.s.ϕ[i, b, a] * fy_ib
                 temp_J += leakage_direct
                 
                 # Indirect terms
@@ -134,7 +128,7 @@ function se(J)
     s = zeros(Complex, L)
     for i = 1:L
         for n = eachindex(vals)
-            s[i] += abs(v[i,n]) / vals[n]
+            s[i] += norm(v[i,n]) / vals[n]
         end
     end
     return(log.(-s)) 
@@ -147,12 +141,13 @@ calculate the impact of perturbing the ith element in a system
 """
 function im(J) 
     L = size(J)[1]
-    vals = eigvals(J)
-    w = inv(eigvecs(J))
+    Jinv = inv(J)
+    vals = eigvals(Jinv)
+    w = eigvecs(Jinv)
     s = zeros(Complex, L)
     for i = 1:L
         for n = eachindex(vals)
-            s[i] += abs(w[i,n]) / vals[n]
+            s[i] += norm(w[i,n]) / vals[n]
         end
     end
     return(log.(-s)) 

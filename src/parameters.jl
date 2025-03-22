@@ -35,14 +35,14 @@ function get_structural_params(U::Matrix{Float64},D::Matrix{Float64}, Λ::Vector
     end
 
     #sample flux balances - add random influx + outflow
-    ρ .+= (1 .- ρ) .* rand(M)
-    σ .+= (1 .- σ) .* rand(M)
+   # ρ .+= (1 .- ρ) .* rand(M)
+   # σ .+= (1 .- σ) .* rand(M)
     ρ̃ = 1 .- ρ
     σ̃ = 1 .- σ
 
     # #structural
-    α = rand() .+ rand(N) ./ 10
-    β = rand() .+ rand(M) ./ 10
+    α = ones(N) 
+    β = ones(M)
 
     ϕ = Array{Float64, 3}(undef,N,M,M)
     pmat = χ * D

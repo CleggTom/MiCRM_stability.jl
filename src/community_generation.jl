@@ -1,16 +1,19 @@
 function random_community(N,M,Cu,Cd)
-    U = Float64.(rand(N,M) .< Cu) 
-    #evey consumer has a link
-    for i = 1:N
-        if sum(U[i,:]) == 0
-            U[i, rand(1:M)] = 1
-        end
-    end
+    U = Float64.(rand(N,M) .< Cu)
+    # #evey consumer has a link
+    # for i = 1:N
+    #     if sum(U[i,:]) == 0
+    #         U[i, rand(1:M)]
+    #     end
+    # end
+
+    U .= U .* rand(N,M)
     #normalise consumer uptakes to 1
-    [U[i,:] .= U[i,:] ./ sum(U[i,:]) for i = 1:N]
-    U[isnan.(U)] .= 0.0
+    # [U[i,:] .= U[i,:] ./ sum(U[i,:]) for i = 1:N]
+    # U[isnan.(U)] .= 0.0
 
     D =  Float64.(rand(M,M) .< Cd) 
+    D .= D .* rand(M,M)
     [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
     D[isnan.(D)] .= 0.0
 
@@ -25,7 +28,7 @@ function spec_community(N,M,pc,pr,wc,wr)
         if rand() < pc
             U[i,sample(1:M, 1)] .= 1
         else
-            U[i,sample(1:M, wc)] .= 1
+            U[i,sample(1:M, Int(wc))] .= 1
         end
     end
 
@@ -36,7 +39,7 @@ function spec_community(N,M,pc,pr,wc,wr)
         if rand() < pr
             D[a,sample(1:M, 1)] .= 1
         else
-            D[a,sample(1:M, wr)] .= 1
+            D[a,sample(1:M, Int(wr))] .= 1
         end
     end
         
@@ -47,6 +50,33 @@ function spec_community(N,M,pc,pr,wc,wr)
     return(MiCRM_stability.Community(N,M,U,D))
 end
 
+function niche_model(N,M,λc,λr; nC = rand(N), nR = rand(M))
+    #sorting
+    nC = nC[[p for p = nC] |> sortperm]
+    nR = nR[[p for p = nR] |> sortperm]
+        
+    U = zeros(N,M)
+    
+    for i = 1:N
+        dn = abs.(nC[i] .- nR) 
+        U[i,:] .= rand(N) .< exp.(-λc .* dn)
+        U[i,:] .*= rand(N)
+    end
+    
+    D = zeros(M,M)
+    for i = 1:M
+        dn = nR[i] .- nR 
+        dn[dn .< 0] .= Inf
+        D[i,:] .= rand(N) .< exp.(-λr .* dn)
+        D[i,:] .*= rand(M)
+
+        D[i,:] .= D[i,:] ./ sum(D[i,:])
+    end
+    
+    D[isnan.(D)] .= 0.0
+
+    return MiCRM_stability.Community(N,M,U,D)
+end
 
 function sbm_community(N, M, np, Up, Dp)
     @assert size(Up) == (np,np)
