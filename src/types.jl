@@ -16,11 +16,13 @@ struct structural_params
     η::Matrix{Float64}  # Proportion of leakage gain from consumer i
 
     χ::Matrix{Float64}  # Proportion of substrate gain from resource a
-    ϕ::Array{Float64,3} # Waste product of b from uptake of a by i
+    D::Matrix{Float64}  # Stoichometric matrix
 
-    function structural_params(α, β, Λ, ρ, ρ̃, σ, σ̃, γ, η, χ, ϕ)
+    ϕ_norm_inv::Array{Float64,2} # Proportion of substrate production to resource a
+
+    function structural_params(α, β, Λ, ρ, ρ̃, σ, σ̃, γ, η, χ, D, ϕ_norm_inv)
         Ω = 1.0 .- Λ  # Precompute (1 - Λ)
-        new(α, β, Λ, Ω, ρ, ρ̃, σ, σ̃, γ, η, χ, ϕ)
+        new(α, β, Λ, Ω, ρ, ρ̃, σ, σ̃, γ, η, χ, D, ϕ_norm_inv)
     end
 end
 
@@ -36,7 +38,7 @@ struct exponential_params
     fy::Matrix{Float64}  # Substrate proportion to resource
 
     # Leakage structure
-    λy::Matrix{Float64}  # Total leakage to resources
+    λg::Vector{Float64}  # Total leakage to uptake
 
     # External resource dynamics
     iy::Vector{Float64}
