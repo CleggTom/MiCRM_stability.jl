@@ -1,24 +1,34 @@
 function random_community(N,M,Cu,Cd)
     U = Float64.(rand(N,M) .< Cu)
-    # #evey consumer has a link
-    # for i = 1:N
-    #     if sum(U[i,:]) == 0
-    #         U[i, rand(1:M)]
-    #     end
-    # end
-
     U .= U .* rand(N,M)
+    U[U .< 1e-5] .= 0.0
     #normalise consumer uptakes to 1
-    # [U[i,:] .= U[i,:] ./ sum(U[i,:]) for i = 1:N]
-    # U[isnan.(U)] .= 0.0
+    [U[i,:] .= U[i,:] ./ sum(U[i,:]) for i = 1:N]
+    U[isnan.(U)] .= 0.0
 
     D =  Float64.(rand(M,M) .< Cd) 
     D .= D .* rand(M,M)
+    D[D .< 1e-5] .= 0.0
     [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
     D[isnan.(D)] .= 0.0
 
     return(Community(N,M,U,D))
 end
+
+function random_community_dirch(N,M,αu,αd)
+    χ  = zeros(N,M)
+    for i in 1:N
+        χ[i, :] .= rand(Dirichlet(αu * ones(M)))  # replaces thresholding and normalizing
+    end
+    
+    D = zeros(M,M)
+    for i in 1:M
+        D[i, :] .= rand(Dirichlet(αd * ones(M)))
+    end
+
+    return(Community(N,M,χ,D))
+end
+
 
 function spec_community(N,M,pc,pr,wc,wr)
     U = zeros(N,M)
