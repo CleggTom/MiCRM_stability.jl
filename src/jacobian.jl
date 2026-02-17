@@ -9,7 +9,7 @@
 # end
 
 # Optimized Jacobian function with reduced setindex! operations
-function jacobian!(p::Parameters, J::Matrix{Float64})
+function jacobian!(p::Parameters, J::AbstractMatrix{Float64})
     J .= 0
     # Loop over consumers
     @inbounds for i = 1:p.N
@@ -22,14 +22,14 @@ function jacobian!(p::Parameters, J::Matrix{Float64})
         Λ_i = p.s.Λ[i]
         
         #consumer intraspecific element
-        @fastmath J[i, i] = α_i * (gx_i * (1 - Λ_i * (1 + λg_i)) - Ω_i * mx_i)
+        J[i, i] = α_i * (gx_i * (1 - Λ_i * (1 + λg_i)) - Ω_i * mx_i)
 
         #consumer to resources
         for a = 1:p.M
             χ_ia = p.s.χ[i, a]
             fy_ia = p.e.fy[i, a]            
             # dxi/dya
-            @fastmath J[i, a + p.N] = α_i * gs_i * χ_ia * fy_ia *(1 - Λ_i * (1 + λg_i))
+            J[i, a + p.N] = α_i * gs_i * χ_ia * fy_ia *(1 - Λ_i * (1 + λg_i))
         end
     end
 
@@ -53,12 +53,12 @@ function jacobian!(p::Parameters, J::Matrix{Float64})
             λg_i = p.e.λg[i]
 
             # C block (resource response to consumers)
-            @fastmath J[idx_a, i] += β_a * gx_i * (ρ̃_a * η_ia * (1 + λg_i) - σ̃_a * γ_ia)
+            J[idx_a, i] += β_a * gx_i * (ρ̃_a * η_ia * (1 + λg_i) - σ̃_a * γ_ia)
         end
 
         #D-block
         # Inflow/outflow ONCE
-        @fastmath J[idx_a, idx_a] += ρ_a * iy_a - σ_a * oy_a
+        J[idx_a, idx_a] += ρ_a * iy_a - σ_a * oy_a
     
         @inbounds for b = 1:p.M
             idx_b = b + p.N
@@ -80,15 +80,15 @@ function jacobian!(p::Parameters, J::Matrix{Float64})
 
                 ϕ_iba = (χ_ib * D_ba) * ϕ_norm_inv_ia
  
-                @fastmath du = gs_shift * χ_ib * fy_ib 
-                @fastmath dk = ϕ_iba * fy_ib + χ_ib * fy_ib * (gs_i * (1 + λg_i) - 1)
+                du = gs_shift * χ_ib * fy_ib 
+                dk = ϕ_iba * fy_ib + χ_ib * fy_ib * (gs_i * (1 + λg_i) - 1)
                 
-                @fastmath uptake_term = σ̃_a * γ_ia * (du + (a==b)*fy_ib)
-                @fastmath leakage_term = ρ̃_a * η_ia * dk
+                uptake_term = σ̃_a * γ_ia * (du + (a==b)*fy_ib)
+                leakage_term = ρ̃_a * η_ia * dk
 
-                @fastmath Tmp += leakage_term - uptake_term
+                Tmp += leakage_term - uptake_term
             end
-             J[idx_a, idx_b] = Tmp
+             J[idx_a, idx_b] += Tmp
         end
     end
 end

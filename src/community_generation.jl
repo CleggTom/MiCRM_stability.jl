@@ -1,13 +1,13 @@
 function random_community(N,M,Cu,Cd)
     U = Float64.(rand(N,M) .< Cu)
-    U .= U .* rand(N,M)
+    # U .= U .* rand(N,M)
     U[U .< 1e-5] .= 0.0
     #normalise consumer uptakes to 1
     [U[i,:] .= U[i,:] ./ sum(U[i,:]) for i = 1:N]
     U[isnan.(U)] .= 0.0
 
     D =  Float64.(rand(M,M) .< Cd) 
-    D .= D .* rand(M,M)
+    # D .= D .* rand(M,M)
     D[D .< 1e-5] .= 0.0
     [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
     D[isnan.(D)] .= 0.0
