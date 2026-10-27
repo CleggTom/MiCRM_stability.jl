@@ -1,3 +1,10 @@
+"""
+    get_structural_params(N::Int, M::Int, χ::Matrix{Float64},D::Matrix{Float64},
+     Λ::Vector{Float64}, G::Vector{Float64}, α::Vector{Float64}, β::Vector{Float64},
+     C_pert::Vector{Float64})
+
+Generate structural parameters from a nomalised uptake (χ) and stoichometric (D) matrix. Also requires input parameters for consumer leaakage (Λ), growth (G) and the scale parameters (α, β).
+"""
 function get_structural_params(N::Int, M::Int, χ::Matrix{Float64},D::Matrix{Float64},
      Λ::Vector{Float64}, G::Vector{Float64}, α::Vector{Float64}, β::Vector{Float64},
      C_pert::Vector{Float64})
@@ -49,5 +56,5 @@ function get_structural_params(N::Int, M::Int, χ::Matrix{Float64},D::Matrix{Flo
     ϕ_norm_inv = 1 ./ (χ * D)  # precomputed
     ϕ_norm_inv[isinf.(ϕ_norm_inv)] .= 0.0
 
-    return MiCRM_stability.structural_params(α,β,Λ,ρ,ρ̃,σ,σ̃,γ,η,χ, D, ϕ_norm_inv);
+    return MiCRM_stability.structural_params(α, β, Λ, ρ, ρ̃, σ, σ̃, γ, η, χ, D, ϕ_norm_inv);
 end

@@ -1,3 +1,10 @@
+
+
+"""
+    structural_params
+
+Type to store structural parameters from generalised model
+"""
 struct structural_params
     # Scale params
     α::Vector{Float64}  # Scale param for consumers
@@ -26,6 +33,11 @@ struct structural_params
     end
 end
 
+"""
+    exponential_params
+
+Type to store exponential parameters from generalised model
+"""
 struct exponential_params
     # Consumer growth
     gx::Vector{Float64}  # Growth to consumer

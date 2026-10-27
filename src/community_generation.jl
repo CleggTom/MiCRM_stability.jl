@@ -1,3 +1,9 @@
+
+"""
+    random_community(N,M,Cu,Cd)
+
+Randomly generated communtiy with uptake and stoichometry matricies createcd with random graph structure and connectance 'Cu' and 'Cd'
+"""
 function random_community(N,M,Cu,Cd)
     U = Float64.(rand(N,M) .< Cu)
     # U .= U .* rand(N,M)
@@ -15,108 +21,78 @@ function random_community(N,M,Cu,Cd)
     return(Community(N,M,U,D))
 end
 
-function modular_matrix(N, M, K, Q, total_links)
-    mat = zeros(N,M)
-    
-    # 1. Define the "Inside" and "Outside" budgets
-    internal_budget = round(Int, total_links * Q)
-    external_budget = total_links - internal_budget
-    
-    # 2. Identify which coordinates are "Internal"
-    rows_per_mod = div(N, K)
-    cols_per_mod = div(M, K)
-    
-    internal_coords = Vector{CartesianIndex{2}}()
-    external_coords = Vector{CartesianIndex{2}}()
-    
-    for r in 1:N, c in 1:M
-        # Determine which module this row and column belong to
-        mod_r = min(K, div(r-1, rows_per_mod) + 1)
-        mod_c = min(K, div(c-1, cols_per_mod) + 1)
-        
-        if mod_r == mod_c
-            push!(internal_coords, CartesianIndex(r, c))
+
+"""
+    rewire_row!(row::BitVector, σ::Real)
+
+Randomly shuffles a row with probabiltiy σ
+"""
+function rewire_row!(row::BitVector, σ::Real)
+    σ <= 0.0 && return
+    for idx in findall(row)
+        if rand() < σ
+            avail = findall(.!row)
+            if !isempty(avail)
+                row[idx] = false
+                row[rand(avail)] = true
+            end
         end
-        
-        push!(external_coords, CartesianIndex(r, c))
     end
-
-    # 3. Sample from the budgets
-    # We use 'sample' from StatsBase or just shuffle
-    
-    for idx in shuffle(internal_coords)[1:min(length(internal_coords), internal_budget)]
-        mat[idx] = 1.0
-    end
-    
-    for idx in shuffle(external_coords)[1:min(length(external_coords), external_budget)]
-        mat[idx] = 1.0
-    end
-
-    return mat
 end
 
-function modular_community(N,M,Ku,Kd,Qu,Qd,Lu,Ld)
-    U = MiCRM_stability.modular_matrix(N,M,Ku,Qu,Lu)
-    [U[i,:] .= U[i,:] ./ sum(U[i,:]) for i = 1:N]
-    U[isnan.(U)] .= 0.0
-    
-    D = MiCRM_stability.modular_matrix(M,M,Kd,Qd,Ld)
-    [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
-    D[isnan.(D)] .= 0.0
+"""
+    interpolated_niche_model(N, M, C, d, p)
 
-    return(MiCRM_stability.Community(N,M,U,D))
-end
+Interpolates between a structured 1D niche model (p = 1.0) 
+and a randomized consumer-resource network (p = 0.0).
+"""
+function niche_model(N::Int, M::Int, C::Real, d::Real, σ::Real; return_niche = false)
 
-function hierarchical_modular_matrix(N, M, K, Q, total_links, off)
-    mat = zeros(N, M)
-    
-    # 1. Define budgets
-    internal_budget = round(Int, total_links * Q)
-    external_budget = total_links - internal_budget
-    
-    rows_per_mod = div(N, K)
-    cols_per_mod = div(M, K)
-    
-    # 2. Identify coordinates
-    # "Internal" now means mod_c <= mod_r (Lower triangular block structure)
-    internal_coords = Vector{CartesianIndex{2}}()
-    external_coords = Vector{CartesianIndex{2}}()
-    
-    for r in 1:N, c in 1:M
-        mod_r = min(K, div(r-1, rows_per_mod) + 1)
-        mod_c = min(K, div(c-1, cols_per_mod) + 1)
-        
-        # This is the change: links are "Internal" if they point to 
-        # a module at or below the current one (Trophic Flow)
-        if any(mod_c .== (mod_r .+ off)) 
-            push!(internal_coords, CartesianIndex(r, c))
-        else
-            push!(external_coords, CartesianIndex(r, c))
+    ni = sort(rand(N)) # Consumers
+    na = sort(rand(M)) # Resources
+
+    #distributions for connectivity
+    dist_C = Beta(1.0, (1 / C) - 1)
+    dist_d = Beta(1.0, (1 / d) - 1)
+
+    # 1. Consumer uptake matrix U (N x M)
+    U = zeros(Float64, N, M)
+    for i in 1:N
+        row = falses(M)
+        while !any(row)
+            wi = rand(dist_C) / 2
+            row .= (na .> (ni[i] - wi)) .&& (na .< (ni[i] + wi))
+        end
+        rewire_row!(row, σ)
+        if sum(row) > 0
+            U[i, :] .= row ./ sum(row)
         end
     end
 
-    # 3. Sample from the budgets
-    # Internal: Filling the lower-triangular blocks
-    for idx in shuffle(internal_coords)[1:min(length(internal_coords), internal_budget)]
-        mat[idx] = 1.0 # Or use your specific distribution for weights
+    # 2. Resource leakage matrix L (M x M)
+    L = zeros(Float64, M, M)
+    for α in 1:(M - 1)
+        row = falses(M)
+        while !any(row)
+            #draw position
+            ca = rand(dist_d)
+            pa = na[α] + (1.0 - na[α]) * ca
+            #draw width
+            wa = rand(dist_C) / 2
+            
+            # Niche leakage strictly downstream: na[α] < target
+            row .= (na .>  max(na[α], pa - wa)) .&& (na .< (pa + wa))
+
+        end
+        rewire_row!(row, σ)
+        row[α] = 0.0
+        if sum(row) > 0
+            L[α, :] .= row ./ sum(row)
+        end
     end
-    
-    # External: Filling the upper-triangular blocks (the "Long loops")
-    for idx in shuffle(external_coords)[1:min(length(external_coords), external_budget)]
-        mat[idx] = 1.0
-    end
-
-    return mat
-end
-
-function hierarchical_community(N,M,Ku,Kd,Qu,Qd,Lu,Ld)
-    U = MiCRM_stability.modular_matrix(N,M,Ku,Qu,Lu)
-    [U[i,:] .= U[i,:] ./ sum(U[i,:]) for i = 1:N]
-    U[isnan.(U)] .= 0.0
-    
-    D = MiCRM_stability.hierarchical_modular_matrix(M,M,M,Qd,Ld,1:Kd)
-    [D[i,:] .= D[i,:] ./ sum(D[i,:]) for i = 1:M]
-    D[isnan.(D)] .= 0.0
-
-    return(MiCRM_stability.Community(N,M,U,D))
+    if !return_niche
+        return MiCRM_stability.Community(N, M, U, L)
+    else
+        return MiCRM_stability.Community(N, M, U, L), (ni,na)
+    end 
 end

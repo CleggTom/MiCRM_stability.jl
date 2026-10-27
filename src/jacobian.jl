@@ -1,20 +1,15 @@
-# function calculate_g_s(p::Parameters)
-#     res = zeros(p.N,p.M)
-#     for i = 1:p.N
-#         for a = 1:p.M
-#             res[i,a] = p.e.fy[i,a] * p.s.χ[i,a] * (p.e.gs[i] - 1)
-#         end
-#     end
-#     return(res)
-# end
 
-# Optimized Jacobian function with reduced setindex! operations
+"""
+    jacobian!(p::Parameters, J::AbstractMatrix{Float64})
+
+Computes jacobian matrix in place (J) with given parameter set p.
+"""
 function jacobian!(p::Parameters, J::AbstractMatrix{Float64})
     J .= 0
     # Loop over consumers
     @inbounds for i = 1:p.N
         α_i = p.s.α[i]
-        Ω_i = p.s.Ω[i]
+        Ω_i = p.s.Ω[i] #1-λ
         gx_i = p.e.gx[i]
         mx_i = p.e.mx[i]
         gs_i = p.e.gs[i]
@@ -91,52 +86,4 @@ function jacobian!(p::Parameters, J::AbstractMatrix{Float64})
              J[idx_a, idx_b] += Tmp
         end
     end
-end
-
-##Metrics
-function gc!(G, J, x0)
-    # G = similar(J)
-    for i = eachindex(x0)
-        x0[i] = 1.0
-        G[i,:] = -J \ x0
-        x0[i] = 0.0
-    end
-end
-
-
-"""
-    se(J, i)
-
-calculate sensitvtiy of the ith element from a jacobian
-"""
-function se(J) 
-    L = size(J)[1]
-    vals = eigvals(J)
-    v = eigvecs(J)
-    s = zeros(Complex, L)
-    for i = 1:L
-        for n = eachindex(vals)
-            s[i] += norm(v[i,n]) / vals[n]
-        end
-    end
-    return(log.(-s)) 
-end
-
-"""
-    im(J, i)
-
-calculate the impact of perturbing the ith element in a system
-"""
-function im(J) 
-    L = size(J)[1]
-    Jinv = inv(J)
-    vals = eigvals(Jinv)
-    w = eigvecs(Jinv)
-    s = zeros(Complex, L)
-    for i = 1:L
-        for n = eachindex(vals)
-            s[i] += norm(w[i,n]) / vals[n]
-        end
-    end
-    return(log.(-s)) 
 end
