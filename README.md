@@ -1,6 +1,6 @@
 # MiCRM_stability.jl
 
-This package provides an implementation of the generalised microbial consumer resource model as detailed in the paper [Generalised modelling reveals stabilising mechanisms in cross-feeding microbial communities][https://arxiv.org/abs/2610.31154].
+This package provides an implementation of the generalised microbial consumer resource model as detailed in the paper [Generalised modelling reveals stabilising mechanisms in cross-feeding microbial communities](https://arxiv.org/abs/2610.31154).
 
 ### Instalation
 To install the package in a julia environment run the line
